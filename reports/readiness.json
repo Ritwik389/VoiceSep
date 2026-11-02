@@ -1,10 +1,12 @@
 {
   "release_ready": false,
-  "stage": "waiting_for_cpu_ui_restart",
+  "stage": "cpu_preparation_recovery_running",
   "five_speaker_checkpoint": null,
   "evaluation_report": null,
   "software_checks": {
     "python_tests": 33,
+    "kaggle_downloader_tests": 7,
+    "kaggle_http_range_probe": "passed",
     "playback_tests": 3,
     "frontend_build": "passed",
     "official_backbone_sha256_verified": true,
@@ -19,22 +21,22 @@
   "repository_visibility": "private",
   "kaggle_preparation_notebook": "https://www.kaggle.com/code/ritwik8307/voicesep-data-preparation",
   "kaggle_last_verified_run": {
-    "version": 4,
+    "version": 6,
     "device": "cpu",
     "source_loading": "passed",
     "package_installation": "passed",
     "indicvoices_access_preflight": "passed",
-    "status": "failed_english_network_timeout",
+    "status": "resumable_english_download_running",
     "gpu_training_submitted": false
   },
   "local_workflow_controller": {
     "status_file": "runs/kaggle-workflow/status.json",
     "scope": "validate corpus, benchmark, then one bounded training session",
     "started": true,
-    "state": "waiting_for_ui_restart",
+    "state": "waiting_preparation",
     "after_preparation_version": 5
   },
   "verified_on": "2026-11-03",
   "corrected_preparation_draft_version": 5,
-  "reason": "Preparation version 4 failed on a LibriSpeech socket timeout. Corrected private draft 5 uses byte-range resumption, publisher-mirror retries and checksum verification before local extraction. The recovery controller is waiting for a newer UI-started CPU run; GPU training has not started."
+  "reason": "Recovery version 6 is running with the corrected downloader and has saved archive bytes to disk. The controller is pinned to version 6. Seven downloader tests and a live range request also passed on Kaggle CPU. Full corpus preparation and GPU training remain pending."
 }
