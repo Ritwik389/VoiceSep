@@ -38,7 +38,23 @@ Open `https://www.kaggle.com/code/YOUR_KAGGLE_USERNAME/voicesep-data-preparation
 
 The CPU job selects a bounded corpus, resamples to 8 kHz, splits original speakers, and freezes validation/test recipes. Defaults target up to 30 English and 20 Hindi hours; `preparation.json` records actual retained hours. Access failure or insufficient speakers stops preparation. Do not run a GPU stage before preparation succeeds and its output is saved. Do not make outputs containing publisher-controlled data public.
 
+## Continue through one training session automatically
+
+After starting preparation through the UI, the local controller can wait for its saved output, validate the corpus, submit the T4 benchmark, and then submit **one** training session. It uses the existing generated jobs; do not regenerate or replace that source snapshot while the controller runs.
+
+```sh
+.tools/kaggle/bin/python scripts/run_kaggle_workflow.py --owner YOUR_KAGGLE_USERNAME
+```
+
+The controller checks disjoint speakers and frozen-manifest hashes before allocating a GPU, requires a successful 100-step benchmark within 16 GB, and checks free quota before each submission. It pins the exact completed notebook versions as inputs. Benchmark execution is capped at one hour; the training loop has its existing six-hour budget within an eight-hour session cap. Quota reservations allow conservatively for the two allocated T4s. It never enables billing, repeats a submission after an ambiguous response, or automatically launches a second training session.
+
+Progress is written atomically to `runs/kaggle-workflow/status.json`. Selected reports and checkpoints download to that directory when stages complete; audio stays on Kaggle. The CPU preparation session must complete before its output can be validated. A failed or canceled stage stops the controller. Restart the same command with the same jobs/output directory after resolving a recoverable issue; a lock prevents duplicate local controllers. A completed run does not resubmit itself.
+
+The controller runs on this computer, so it needs the computer running and connected to advance stages. Already submitted Kaggle jobs run remotely. To prevent subsequent submissions, create `runs/kaggle-workflow/STOP`; cancel a currently running remote job through Kaggle's UI. Remove the stop file before intentionally restarting the controller. The final `resume_required` field distinguishes a saved training session from a finished model; quality gates and listening review still apply.
+
 ## Benchmark, then train
+
+These manual commands are an alternative to the controller; do not use both for the same stages.
 
 ```sh
 .tools/kaggle/bin/kaggle kernels push -p dist/kaggle/benchmark --accelerator NvidiaTeslaT4

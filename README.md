@@ -38,6 +38,8 @@ Transcription and embedding models are downloaded on first explicitly enabled us
 
 For the selected Kaggle route, use [the staged Kaggle instructions](docs/KAGGLE.md): private source upload → CPU data preparation → 100-step T4 benchmark → resumable training. CPU preparation avoids spending GPU time downloading audio. IndicVoices-R currently requires publisher-approved Hugging Face access; the old direct Hindi download returns access denied.
 
+After the secret-dependent CPU job is started through Kaggle's UI, the local one-run controller can validate its output and advance through the benchmark and one bounded training session. It checks free quota, pins completed input versions, and writes progress to `runs/kaggle-workflow/status.json`.
+
 The [Colab notebook](notebooks/01_train_colab.ipynb) and [manual Kaggle notebook](notebooks/02_train_kaggle.ipynb) remain alternatives for an already prepared corpus. They detect CUDA, persist checkpoints, benchmark memory/throughput, and use the same CLI as local execution. They do not purchase compute. Free GPU quotas and actual training time depend on the provider.
 
 1. Download LibriSpeech training audio and the Hindi portion of IndicVoices-R, including its original speaker metadata. See [data preparation](docs/DATA.md).
