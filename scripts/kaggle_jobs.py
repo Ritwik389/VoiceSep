@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -37,19 +38,41 @@ def build(owner, output=None, resume_kernel=None, run_number=1):
     bundle_dir = output / "source"
     bundle_dir.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, bundle_dir / source.name)
+    # Kaggle expands uploaded ZIPs. Verify extracted files against a pinned sidecar manifest.
+    with zipfile.ZipFile(source) as archive:
+        file_hashes = {name: hashlib.sha256(archive.read(name)).hexdigest()
+                       for name in archive.namelist() if not name.endswith("/")}
+    manifest = json.dumps({"archive_sha256": sha, "files": file_hashes}, sort_keys=True)
+    (bundle_dir / "voicesep-source-manifest.json").write_text(manifest)
+    manifest_sha = hashlib.sha256(manifest.encode()).hexdigest()
     source_ref = f"{owner}/voicesep-research-source"
     (bundle_dir / "dataset-metadata.json").write_text(json.dumps({"id": source_ref,
         "title": "VoiceSep research source", "licenses": [{"name": "other"}],
         "description": "Private VoiceSep source bundle. Apache-2.0; MERL attribution retained. No audio or model binaries. SHA256 " + sha}, indent=2))
     setup = f'''from pathlib import Path
-import hashlib, os, subprocess, sys, zipfile
-archive = next(Path('/kaggle/input').rglob('voicesep-source.zip'))
-assert hashlib.sha256(archive.read_bytes()).hexdigest() == {sha!r}, 'Source bundle changed; regenerate job metadata.'
+import hashlib, json, os, shutil, subprocess, sys, zipfile
+manifests = list(Path('/kaggle/input').rglob('voicesep-source-manifest.json'))
+assert len(manifests) == 1, 'Attach the intended private VoiceSep source dataset.'
+manifest_file = manifests[0]
+assert hashlib.sha256(manifest_file.read_bytes()).hexdigest() == {manifest_sha!r}, 'Source manifest changed; regenerate job metadata.'
+source_manifest = json.loads(manifest_file.read_text())
 PROJECT = Path('/kaggle/working/voicesep')
 PROJECT.mkdir(exist_ok=True)
-with zipfile.ZipFile(archive) as bundle:
-    assert all((PROJECT / name).resolve().is_relative_to(PROJECT.resolve()) for name in bundle.namelist())
-    bundle.extractall(PROJECT)
+archive = manifest_file.parent / 'voicesep-source.zip'
+if archive.is_file():
+    assert hashlib.sha256(archive.read_bytes()).hexdigest() == {sha!r}, 'Source archive changed.'
+    with zipfile.ZipFile(archive) as bundle:
+        assert all((PROJECT / name).resolve().is_relative_to(PROJECT.resolve()) for name in bundle.namelist())
+        bundle.extractall(PROJECT)
+else:
+    for name, digest in source_manifest['files'].items():
+        original = manifest_file.parent / name
+        destination = PROJECT / name
+        assert original.resolve().is_relative_to(manifest_file.parent.resolve())
+        assert destination.resolve().is_relative_to(PROJECT.resolve())
+        assert hashlib.sha256(original.read_bytes()).hexdigest() == digest, f'Source file changed: {{name}}'
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(original, destination)
 os.chdir(PROJECT)
 subprocess.run([sys.executable, '-m', 'pip', 'install', '-e', '.[data]'], check=True)
 def cli(*args):

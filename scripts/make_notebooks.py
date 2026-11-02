@@ -115,12 +115,21 @@ print('Checkpoints persist in:', PERSIST)
 write('02_train_kaggle.ipynb', """from pathlib import Path
 import zipfile
 # Add voicesep-source.zip as a private Kaggle notebook input. Enable GPU + Internet.
-archive = next(Path('/kaggle/input').rglob('voicesep-source.zip'))
+archives = list(Path('/kaggle/input').rglob('voicesep-source.zip'))
 PROJECT = Path('/kaggle/working/voicesep')
 PROJECT.mkdir(exist_ok=True)
-with zipfile.ZipFile(archive) as source:
-    assert all((PROJECT / name).resolve().is_relative_to(PROJECT.resolve()) for name in source.namelist())
-    source.extractall(PROJECT)
+if archives:
+    assert len(archives) == 1, 'Attach only one source archive.'
+    with zipfile.ZipFile(archives[0]) as source:
+        assert all((PROJECT / name).resolve().is_relative_to(PROJECT.resolve()) for name in source.namelist())
+        source.extractall(PROJECT)
+else:
+    # Kaggle expands uploaded ZIP archives into the dataset root.
+    import shutil
+    roots = [path.parent for path in Path('/kaggle/input').rglob('pyproject.toml')
+             if (path.parent / 'src/voicesep/cli.py').is_file()]
+    assert len(roots) == 1, 'Attach exactly one VoiceSep source input.'
+    shutil.copytree(roots[0], PROJECT, dirs_exist_ok=True)
 """, """PERSIST = Path('/kaggle/working/voicesep-checkpoints')
 PERSIST.mkdir(parents=True, exist_ok=True)
 # Kaggle working files are NOT durable until you save a notebook version with outputs.

@@ -17,5 +17,6 @@
   },
   "source_repository": "https://github.com/Ritwik389/VoiceSep",
   "repository_visibility": "private",
-  "reason": "GPU training and held-out English/Hindi speech evaluation have not run. Kaggle sign-in and Hindi data access are required."
+  "kaggle_preparation_notebook": "https://www.kaggle.com/code/ritwik8307/voicesep-data-preparation",
+  "reason": "Kaggle login and private source upload are verified. Real corpus preparation, GPU training and held-out English/Hindi speech evaluation have not completed."
 }

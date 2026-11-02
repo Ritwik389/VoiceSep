@@ -1,6 +1,6 @@
 # Private, free-GPU Kaggle workflow
 
-These jobs have been generated and checked locally; actual submission and GPU results are pending account authentication and Hindi data access. No five-speaker checkpoint is available yet.
+The private CPU preparation notebook is available at [ritwik8307/voicesep-data-preparation](https://www.kaggle.com/code/ritwik8307/voicesep-data-preparation). Kaggle authentication and the private source upload are verified. Data preparation and GPU results remain separate execution stages. No five-speaker checkpoint is available yet.
 
 ## Account setup
 
@@ -28,7 +28,7 @@ python scripts/kaggle_jobs.py --owner YOUR_KAGGLE_USERNAME
 .tools/kaggle/bin/kaggle kernels push -p dist/kaggle/prepare --no-run
 ```
 
-The generated source dataset and all notebooks are private. The archive contains code, configuration and documentation; it excludes recordings, weights and credentials. Each job verifies the source archive SHA-256. Generation alone does not submit a job. If the private source dataset already exists, use `kaggle datasets version -p dist/kaggle/source -m "Update VoiceSep source"` instead of `datasets create`, then regenerate all pending stages against the new archive. Keep one source version consistent throughout a training sequence.
+The generated source dataset and all notebooks are private. The archive contains code, configuration and documentation; it excludes recordings, weights and credentials. Kaggle expands uploaded ZIPs, so generation adds `voicesep-source-manifest.json` alongside the ZIP. Each job verifies the pinned manifest and every expanded file; intact ZIP inputs are also supported. Upload the entire generated source directory. Generation alone does not submit a job. If the private source dataset already exists, use `kaggle datasets version -p dist/kaggle/source -m "Update VoiceSep source"` instead of `datasets create`, then regenerate all pending stages against the new archive. Keep one source version consistent throughout a training sequence.
 
 Open `https://www.kaggle.com/code/YOUR_KAGGLE_USERNAME/voicesep-data-preparation`, enable the `HF_TOKEN` secret, and run/save the notebook with outputs. It is CPU only. Alternatively, after enabling the secret, submit it using:
 

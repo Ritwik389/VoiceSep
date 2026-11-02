@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import shutil
+import zipfile
 
 import numpy as np
 import pytest
@@ -44,7 +45,9 @@ def test_generated_kaggle_jobs_are_private_compilable_and_cpu_first(tmp_path, mo
     spec.loader.exec_module(module)
     archive = tmp_path / "dist" / "voicesep-source.zip"
     archive.parent.mkdir()
-    archive.write_bytes(b"software fixture, not a training source")
+    with zipfile.ZipFile(archive, 'w') as bundle:
+        bundle.writestr('pyproject.toml', '# software fixture, not a training source\n')
+        bundle.writestr('src/voicesep/cli.py', '# source integrity fixture\n')
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(module.subprocess, "run", lambda *args, **kwargs: None)
     result = module.build("researcher", tmp_path / "jobs", "researcher/voicesep-gpu-training-01", run_number=2)
@@ -64,3 +67,30 @@ def test_generated_kaggle_jobs_are_private_compilable_and_cpu_first(tmp_path, mo
     assert "researcher/voicesep-gpu-training-01" in training["kernel_sources"]
     with pytest.raises(ValueError):
         module.build("not a username", tmp_path / "invalid")
+
+    # Execute the actual generated loader against both Kaggle's expanded layout and an intact ZIP.
+    nb=json.loads((tmp_path/'jobs/prepare/job.ipynb').read_text())
+    setup=''.join(nb['cells'][1]['source'])
+    input_dir=tmp_path/'input'
+    input_dir.mkdir()
+    sidecar=tmp_path/'jobs/source/voicesep-source-manifest.json'
+    shutil.copyfile(sidecar,input_dir/sidecar.name)
+    with zipfile.ZipFile(archive) as bundle:
+        bundle.extractall(input_dir)
+    cwd=Path.cwd()
+    try:
+        for layout in ('expanded','zip'):
+            destination=tmp_path/f'workspace-{layout}'
+            if layout=='zip':
+                shutil.copyfile(archive,input_dir/archive.name)
+            cell=setup.replace("'/kaggle/input'",repr(str(input_dir)))
+            cell=cell.replace("'/kaggle/working/voicesep'",repr(str(destination)))
+            exec(compile(cell,'generated-kaggle-setup','exec'),{})
+            assert (destination/'src/voicesep/cli.py').read_text()=='# source integrity fixture\n'
+        (input_dir/archive.name).unlink()
+        (input_dir/'src/voicesep/cli.py').write_text('# changed file\n')
+        with pytest.raises(AssertionError,match='Source file changed'):
+            exec(compile(cell.replace(str(destination),str(tmp_path/'tampered')),'changed-source','exec'),{})
+    finally:
+        import os
+        os.chdir(cwd)
