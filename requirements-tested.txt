@@ -1,0 +1,17 @@
+# Direct dependencies used in local software verification; Python 3.10/macOS arm64.
+torch==2.13.0
+numpy==1.26.4
+scipy==1.13.1
+soundfile==0.12.1
+rotary-embedding-torch==0.6.1
+packaging==24.2
+PyYAML==6.0.3
+fastapi==0.110.1
+uvicorn==0.25.0
+python-multipart==0.0.32
+pydantic==2.13.4
+typer==0.27.0
+httpx==0.28.1
+pystoi==0.4.1
+pytest==9.1.1
+pytest-asyncio==0.24.0

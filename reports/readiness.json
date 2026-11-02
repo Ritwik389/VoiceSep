@@ -1,0 +1,19 @@
+{
+  "release_ready": false,
+  "stage": "software_verified_training_pending",
+  "five_speaker_checkpoint": null,
+  "evaluation_report": null,
+  "software_checks": {
+    "python_tests": 16,
+    "playback_tests": 3,
+    "frontend_build": "passed",
+    "official_backbone_sha256_verified": true,
+    "full_architecture_forward_backward": "passed",
+    "browser_widths_checked": [
+      1440,
+      768,
+      390
+    ]
+  },
+  "reason": "No GPU training or held-out English/Hindi speech evaluation has run. GitHub authentication is invalid."
+}

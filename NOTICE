@@ -1,0 +1,19 @@
+VoiceSep
+Copyright 2026 VoiceSep contributors
+
+This project includes TF-Locoformer source from Mitsubishi Electric Research Laboratories.
+Copyright (C) 2024 Mitsubishi Electric Research Laboratories (MERL).
+Apache-2.0. Upstream: https://github.com/merlresearch/tf-locoformer
+Revision: 7a615460d347ff7334a13dbb831d16280da72cdc
+Vendored file: src/voicesep/models/tflocoformer_upstream.py
+
+Official Libri2Mix pretrained checkpoint (not included in Git):
+SHA256 9c691cee4bb0d9664a3fac024b031dfdf8ca3e66fc22a66f2f17119767b49129
+59,979,488 bytes. Apache-2.0 per upstream .reuse/dep5.
+
+Optional Conv-TasNet initialization: JorisCos/ConvTasNet_Libri3Mix_sepclean_8k.
+The model card lists CC-BY-SA-4.0 in metadata and links a CC-BY-SA-3.0 notice in its body.
+Do not relabel these comparison weights as Apache-2.0; retain both notices and clarify terms before redistributing derivatives.
+
+LibriSpeech and IndicVoices-R: retain source attribution and their dataset licenses.
+Optional ECAPA, Whisper, age, and emotion checkpoints: follow each model's own terms.
