@@ -38,3 +38,7 @@ def test_optimizer_resume_matches_uninterrupted_training(tmp_path, monkeypatch):
     assert a['draw_index']==b['draw_index']==2
     assert a['stale_evaluations']==b['stale_evaluations']==1
     assert all(torch.equal(a['model'][key],b['model'][key]) for key in a['model'])
+    report=train(path,tmp_path/'time-limited',pretrained='fixture',device='cpu',max_seconds=1e-9)
+    stopped=torch.load(tmp_path/'time-limited/last.pt',weights_only=True)
+    assert report['stopped_for_time_budget'] is True
+    assert stopped['step']==0 and stopped['draw_index']==0 and stopped['trained'] is False

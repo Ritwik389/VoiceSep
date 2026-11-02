@@ -96,6 +96,15 @@ def split(manifest: Path, output_dir: Path = Path("data"), seed: int = 42):
     emit(split_sources(read_jsonl(manifest), output_dir, seed))
 
 
+@app.command("bootstrap-data")
+def bootstrap_data(destination: Path = Path("data/corpus"), english_hours: float = 30, hindi_hours: float = 20):
+    """Download a bounded real-speech corpus and freeze portable bilingual splits on CPU."""
+    if english_hours <= 0 or hindi_hours <= 0:
+        raise typer.BadParameter("Both corpus budgets must be positive")
+    from .research.bootstrap import bootstrap
+    emit(bootstrap(destination, english_hours, hindi_hours))
+
+
 @app.command("freeze")
 def freeze(manifest: Path, destination: Path, per_condition: int = 100, seconds: float = 4, seed: int = 12345):
     """Create a deterministic bilingual 2/3/4/5-speaker benchmark."""
@@ -106,10 +115,11 @@ def freeze(manifest: Path, destination: Path, per_condition: int = 100, seconds:
 @app.command("train")
 def training(config: Path = Path("configs/train.yaml"), output: Path = Path("runs/tflocoformer"),
              pretrained: Path | None = None, resume: Path | None = None, device: str | None = None,
-             steps: int | None = None, benchmark: bool = False, segment_seconds: float | None = None):
+             steps: int | None = None, benchmark: bool = False, segment_seconds: float | None = None,
+             max_seconds: int | None = None):
     """Fine-tune, resume, or benchmark 100 steps. Free GPU notebooks are supplied."""
     from .research.train import train
-    emit(train(config, output, pretrained, resume, device, steps, benchmark, segment_seconds))
+    emit(train(config, output, pretrained, resume, device, steps, benchmark, segment_seconds, max_seconds))
 
 
 @app.command("calibrate")

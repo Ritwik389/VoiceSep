@@ -4,7 +4,7 @@
   "five_speaker_checkpoint": null,
   "evaluation_report": null,
   "software_checks": {
-    "python_tests": 16,
+    "python_tests": 19,
     "playback_tests": 3,
     "frontend_build": "passed",
     "official_backbone_sha256_verified": true,
@@ -15,5 +15,7 @@
       390
     ]
   },
-  "reason": "No GPU training or held-out English/Hindi speech evaluation has run. GitHub authentication is invalid."
+  "source_repository": "https://github.com/Ritwik389/VoiceSep",
+  "repository_visibility": "private",
+  "reason": "GPU training and held-out English/Hindi speech evaluation have not run. Kaggle sign-in and Hindi data access are required."
 }

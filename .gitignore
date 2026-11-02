@@ -1,4 +1,6 @@
 .venv/
+.tools/
+dist/kaggle-credentials/
 node_modules/
 frontend/dist/
 dist/

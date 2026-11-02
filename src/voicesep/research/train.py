@@ -60,7 +60,9 @@ def validate(model, source_manifest, recipes_path, device, calibration):
 
 
 def train(config_path, output_dir, pretrained=None, resume=None, device=None,
-          steps_override=None, benchmark=False, segment_seconds=None):
+          steps_override=None, benchmark=False, segment_seconds=None, max_seconds=None):
+    if max_seconds is not None and max_seconds <= 0:
+        raise ValueError("The wall-time budget must be positive")
     config = yaml.safe_load(Path(config_path).read_text())
     seed = config["seed"]
     torch.manual_seed(seed)
@@ -135,7 +137,8 @@ def train(config_path, output_dir, pretrained=None, resume=None, device=None,
     started = time.perf_counter()
     losses = []
     try:
-        while step < limit and stale < t.get("early_stopping_evaluations", 5):
+        while (step < limit and stale < t.get("early_stopping_evaluations", 5)
+               and (max_seconds is None or time.perf_counter() - started < max_seconds)):
             model.freeze_backbone(False if benchmark else step < t["warmup_steps"])
             optimizer.zero_grad(set_to_none=True)
             total = 0.
@@ -185,6 +188,8 @@ def train(config_path, output_dir, pretrained=None, resume=None, device=None,
     report = {"completed_steps": step, "steps_this_run": len(losses),
               "seconds_per_step": (time.perf_counter() - started) / max(len(losses), 1),
               "peak_cuda_memory_bytes": torch.cuda.max_memory_allocated() if device.startswith("cuda") else None,
-              "device": device, "benchmark_only": benchmark, "release_ready": False}
+              "device": device, "benchmark_only": benchmark, "release_ready": False,
+              "stopped_for_time_budget": max_seconds is not None and step < limit
+              and time.perf_counter() - started >= max_seconds}
     (output_dir / "throughput.json").write_text(json.dumps(report, indent=2))
     return report

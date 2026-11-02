@@ -3,6 +3,7 @@ from functools import lru_cache
 from collections import defaultdict
 import hashlib
 import json
+import os
 
 import numpy as np
 from scipy.signal import fftconvolve
@@ -55,7 +56,7 @@ def assert_disjoint(*manifests):
 class MixtureFactory:
     def __init__(self, manifest, sample_rate=8000, segment_seconds=4, slots=5, seed=42,
                  partial_overlap_probability=0, noise_probability=0, reverb_probability=0):
-        self.manifest = Path(manifest)
+        self.manifest = Path(manifest).resolve()
         self.entries = read_jsonl(manifest)
         self.sample_rate, self.samples, self.slots = sample_rate, int(segment_seconds * sample_rate), slots
         self.seed = seed
@@ -74,7 +75,8 @@ class MixtureFactory:
 
     @lru_cache(maxsize=16)
     def source(self, path):
-        return load_source(path, self.sample_rate)
+        path = Path(path)
+        return load_source(path if path.is_absolute() else self.manifest.parent / path, self.sample_rate)
 
     def recipe(self, index, condition=None, count=None):
         rng = np.random.default_rng(np.random.SeedSequence([self.seed, int(index)]))
@@ -97,7 +99,8 @@ class MixtureFactory:
                 raise ValueError(f"Empty/silent clean source: {row['path']}")
             crop = int(rng.integers(max(1, len(source) - self.samples + 1)))
             offset = int(rng.integers(0, max(1, self.samples // 2))) if rng.random() < self.partial_probability else 0
-            selected.append({"path": row["path"], "identity": identity, "language": language,
+            portable_path = os.path.relpath(row["path"], self.manifest.parent)
+            selected.append({"path": portable_path, "identity": identity, "language": language,
                              "text": row.get("text", ""), "crop": crop, "offset": offset,
                              "gain_db": float(rng.uniform(-5, 0))})
         return {"id": f"mix-{self.seed}-{index}", "sources": selected, "condition": condition,
