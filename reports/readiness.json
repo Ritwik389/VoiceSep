@@ -18,5 +18,13 @@
   "source_repository": "https://github.com/Ritwik389/VoiceSep",
   "repository_visibility": "private",
   "kaggle_preparation_notebook": "https://www.kaggle.com/code/ritwik8307/voicesep-data-preparation",
-  "reason": "Kaggle login and private source upload are verified. Real corpus preparation, GPU training and held-out English/Hindi speech evaluation have not completed."
+  "kaggle_last_verified_run": {
+    "version": 3,
+    "device": "cpu",
+    "source_loading": "passed",
+    "package_installation": "passed",
+    "status": "stopped_hf_token_unavailable",
+    "gpu_training_submitted": false
+  },
+  "reason": "The CLI-started CPU session could not retrieve HF_TOKEN. Launch preparation from Kaggle UI with the secret enabled. Real corpus preparation, GPU training and held-out English/Hindi evaluation have not completed."
 }

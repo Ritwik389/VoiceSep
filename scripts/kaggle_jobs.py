@@ -41,7 +41,8 @@ def build(owner, output=None, resume_kernel=None, run_number=1):
     # Kaggle expands uploaded ZIPs. Verify extracted files against a pinned sidecar manifest.
     with zipfile.ZipFile(source) as archive:
         file_hashes = {name: hashlib.sha256(archive.read(name)).hexdigest()
-                       for name in archive.namelist() if not name.endswith("/")}
+                       for name in archive.namelist() if not name.endswith("/")
+                       and not any(part.startswith('.') for part in Path(name).parts)}
     manifest = json.dumps({"archive_sha256": sha, "files": file_hashes}, sort_keys=True)
     (bundle_dir / "voicesep-source-manifest.json").write_text(manifest)
     manifest_sha = hashlib.sha256(manifest.encode()).hexdigest()
@@ -56,6 +57,8 @@ assert len(manifests) == 1, 'Attach the intended private VoiceSep source dataset
 manifest_file = manifests[0]
 assert hashlib.sha256(manifest_file.read_bytes()).hexdigest() == {manifest_sha!r}, 'Source manifest changed; regenerate job metadata.'
 source_manifest = json.loads(manifest_file.read_text())
+print({{'source_root': str(manifest_file.parent),
+       'source_top_level': sorted(path.name for path in manifest_file.parent.iterdir())}})
 PROJECT = Path('/kaggle/working/voicesep')
 PROJECT.mkdir(exist_ok=True)
 archive = manifest_file.parent / 'voicesep-source.zip'
@@ -65,10 +68,14 @@ if archive.is_file():
         assert all((PROJECT / name).resolve().is_relative_to(PROJECT.resolve()) for name in bundle.namelist())
         bundle.extractall(PROJECT)
 else:
+    roots = [path.parent for path in manifest_file.parent.rglob('pyproject.toml')
+             if (path.parent / 'src/voicesep/cli.py').is_file()]
+    assert len(roots) == 1, 'Expected one expanded VoiceSep source root.'
+    source_root = roots[0]
     for name, digest in source_manifest['files'].items():
-        original = manifest_file.parent / name
+        original = source_root / name
         destination = PROJECT / name
-        assert original.resolve().is_relative_to(manifest_file.parent.resolve())
+        assert original.resolve().is_relative_to(source_root.resolve())
         assert destination.resolve().is_relative_to(PROJECT.resolve())
         assert hashlib.sha256(original.read_bytes()).hexdigest() == digest, f'Source file changed: {{name}}'
         destination.parent.mkdir(parents=True, exist_ok=True)

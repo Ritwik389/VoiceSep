@@ -28,12 +28,11 @@ python scripts/kaggle_jobs.py --owner YOUR_KAGGLE_USERNAME
 .tools/kaggle/bin/kaggle kernels push -p dist/kaggle/prepare --no-run
 ```
 
-The generated source dataset and all notebooks are private. The archive contains code, configuration and documentation; it excludes recordings, weights and credentials. Kaggle expands uploaded ZIPs, so generation adds `voicesep-source-manifest.json` alongside the ZIP. Each job verifies the pinned manifest and every expanded file; intact ZIP inputs are also supported. Upload the entire generated source directory. Generation alone does not submit a job. If the private source dataset already exists, use `kaggle datasets version -p dist/kaggle/source -m "Update VoiceSep source"` instead of `datasets create`, then regenerate all pending stages against the new archive. Keep one source version consistent throughout a training sequence.
+The generated source dataset and all notebooks are private. The archive contains code, configuration and documentation; it excludes recordings, weights and credentials. Kaggle expands uploaded ZIPs into a nested archive folder, so generation adds `voicesep-source-manifest.json` alongside the ZIP. Each job finds that source root and verifies the pinned manifest and required source files; intact ZIP inputs are also supported. Repository dotfiles are not required by the runtime checks. Upload the entire generated source directory. Generation alone does not submit a job. If the private source dataset already exists, use `kaggle datasets version -p dist/kaggle/source -m "Update VoiceSep source"` instead of `datasets create`, then regenerate all pending stages against the new archive. Keep one source version consistent throughout a training sequence.
 
-Open `https://www.kaggle.com/code/YOUR_KAGGLE_USERNAME/voicesep-data-preparation`, enable the `HF_TOKEN` secret, and run/save the notebook with outputs. It is CPU only. Alternatively, after enabling the secret, submit it using:
+Open `https://www.kaggle.com/code/YOUR_KAGGLE_USERNAME/voicesep-data-preparation`, choose Edit on the latest version, enable the checkbox for `HF_TOKEN` under Add-ons → Secrets, and use **Save Version → Save & Run All**, retaining CPU and Internet settings. Save outputs. It is CPU only. The tested CLI-started session could not retrieve the configured secret; start this secret-dependent stage through the UI. The [official CLI documentation](https://github.com/Kaggle/kaggle-cli/blob/main/docs/kernels.md#using-secrets-in-kernels) confirms that secret setup is UI-only. Do not put a token in notebook code or a private source dataset as a workaround. Monitor the UI-started run with:
 
 ```sh
-.tools/kaggle/bin/kaggle kernels push -p dist/kaggle/prepare
 .tools/kaggle/bin/kaggle kernels status YOUR_KAGGLE_USERNAME/voicesep-data-preparation
 ```
 

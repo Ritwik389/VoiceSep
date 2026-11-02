@@ -48,6 +48,7 @@ def test_generated_kaggle_jobs_are_private_compilable_and_cpu_first(tmp_path, mo
     with zipfile.ZipFile(archive, 'w') as bundle:
         bundle.writestr('pyproject.toml', '# software fixture, not a training source\n')
         bundle.writestr('src/voicesep/cli.py', '# source integrity fixture\n')
+        bundle.writestr('.github/workflows/checks.yml', '# hidden repository file\n')
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(module.subprocess, "run", lambda *args, **kwargs: None)
     result = module.build("researcher", tmp_path / "jobs", "researcher/voicesep-gpu-training-01", run_number=2)
@@ -77,10 +78,17 @@ def test_generated_kaggle_jobs_are_private_compilable_and_cpu_first(tmp_path, mo
     shutil.copyfile(sidecar,input_dir/sidecar.name)
     with zipfile.ZipFile(archive) as bundle:
         bundle.extractall(input_dir)
+    # GitHub workflow files are not required by the notebook runtime.
+    shutil.rmtree(input_dir/'.github')
     cwd=Path.cwd()
     try:
-        for layout in ('expanded','zip'):
+        for layout in ('expanded','wrapped','zip'):
             destination=tmp_path/f'workspace-{layout}'
+            if layout=='wrapped':
+                wrapper=input_dir/'voicesep-source'
+                wrapper.mkdir()
+                for name in ('pyproject.toml','src'):
+                    shutil.move(str(input_dir/name),wrapper/name)
             if layout=='zip':
                 shutil.copyfile(archive,input_dir/archive.name)
             cell=setup.replace("'/kaggle/input'",repr(str(input_dir)))
@@ -88,7 +96,7 @@ def test_generated_kaggle_jobs_are_private_compilable_and_cpu_first(tmp_path, mo
             exec(compile(cell,'generated-kaggle-setup','exec'),{})
             assert (destination/'src/voicesep/cli.py').read_text()=='# source integrity fixture\n'
         (input_dir/archive.name).unlink()
-        (input_dir/'src/voicesep/cli.py').write_text('# changed file\n')
+        next(input_dir.rglob('cli.py')).write_text('# changed file\n')
         with pytest.raises(AssertionError,match='Source file changed'):
             exec(compile(cell.replace(str(destination),str(tmp_path/'tampered')),'changed-source','exec'),{})
     finally:
