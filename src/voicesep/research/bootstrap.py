@@ -6,6 +6,9 @@ import hashlib
 import io
 import json
 import tarfile
+import time
+import re
+import urllib.error
 import urllib.request
 
 import numpy as np
@@ -15,8 +18,85 @@ from scipy.signal import resample_poly
 from .data import write_jsonl, read_jsonl, split_sources, assert_disjoint, freeze_benchmark
 
 LIBRISPEECH_URL = "https://www.openslr.org/resources/12/train-clean-100.tar.gz"
+LIBRISPEECH_MIRRORS = (LIBRISPEECH_URL,
+    "https://openslr.trmal.net/resources/12/train-clean-100.tar.gz",
+    "https://openslr.elda.org/resources/12/train-clean-100.tar.gz")
+LIBRISPEECH_MD5 = "2a93770f6d5c6c964bc36631d331a522"
 HINDI_REPOSITORY = "ai4bharat/indicvoices_r"
 RATE = 8000
+
+
+def _checksum(path):
+    digest = hashlib.md5()
+    with Path(path).open('rb') as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def download_archive(urls, destination, expected_md5, attempts=6):
+    """Keep completed chunks on disk and reconnect with HTTP Range after a stalled read."""
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    partial = destination.with_suffix(destination.suffix + '.part')
+    if destination.is_file():
+        if expected_md5 is None or _checksum(destination) == expected_md5:
+            return destination
+        destination.unlink()  # Only this generated download cache, never source recordings.
+    for attempt in range(attempts):
+        if partial.is_file() and expected_md5 and _checksum(partial) == expected_md5:
+            partial.replace(destination)
+            return destination
+        offset = partial.stat().st_size if partial.exists() else 0
+        headers = {'User-Agent': 'VoiceSep-research/0.1', 'Accept-Encoding': 'identity'}
+        if offset:
+            headers['Range'] = f'bytes={offset}-'
+        url = urls[attempt % len(urls)]
+        request = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                if response.status == 206:
+                    match = re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)', response.headers.get('Content-Range', ''))
+                    if not match or int(match[1]) != offset or not offset <= int(match[2]) < int(match[3]):
+                        raise OSError('Invalid HTTP Content-Range; refusing to append mismatched bytes')
+                    total = int(match[3])
+                    mode = 'ab'
+                elif response.status == 200:
+                    # Some mirrors ignore Range. Restart instead of duplicating the existing prefix.
+                    offset = 0
+                    total = int(response.headers['Content-Length']) if response.headers.get('Content-Length') else None
+                    mode = 'wb'
+                else:
+                    raise OSError(f'Unexpected download status {response.status}')
+                print(json.dumps({'stage': 'english_download', 'attempt': attempt + 1,
+                                  'downloaded_bytes': offset, 'total_bytes': total, 'source': url}), flush=True)
+                last_log = time.monotonic()
+                with partial.open(mode) as output:
+                    while True:
+                        chunk = response.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        output.write(chunk)
+                        offset += len(chunk)
+                        if time.monotonic() - last_log >= 15:
+                            print(json.dumps({'stage': 'english_download', 'downloaded_bytes': offset,
+                                              'total_bytes': total}), flush=True)
+                            last_log = time.monotonic()
+            if total is not None and partial.stat().st_size != total:
+                raise OSError('Archive transfer ended before its declared length')
+            if expected_md5 and _checksum(partial) != expected_md5:
+                partial.unlink()
+                raise OSError('Archive checksum mismatch; retrying a clean download')
+            partial.replace(destination)
+            return destination
+        except (OSError, urllib.error.URLError) as error:
+            print(json.dumps({'stage': 'english_download_retry', 'attempt': attempt + 1,
+                              'saved_bytes': partial.stat().st_size if partial.exists() else 0,
+                              'error': str(error)}), flush=True)
+            if attempt + 1 == attempts:
+                raise RuntimeError('English archive download failed after retries. Retain the downloads/*.part cache to resume.') from error
+            time.sleep(min(5 * (attempt + 1), 30))
+    raise RuntimeError('No archive download attempts were made')
 
 
 def _write_source(root, language, corpus, speaker, identifier, audio, rate, text=""):
@@ -41,15 +121,16 @@ def _write_source(root, language, corpus, speaker, identifier, audio, rate, text
 
 
 def prepare_english(root, hours=30, clips_per_speaker=40, url=LIBRISPEECH_URL):
-    """Read the official archive sequentially without keeping a second, multi-GB archive copy."""
+    """Extract only after a resumable download has passed the publisher's checksum."""
     root = Path(root)
     cache = root / "english-index.jsonl"
     if cache.is_file():
         return read_jsonl(cache)
     entries, counts, transcripts = [], Counter(), {}
     duration = 0.
-    request = urllib.request.Request(url, headers={"User-Agent": "VoiceSep-research/0.1"})
-    with urllib.request.urlopen(request, timeout=180) as response, tarfile.open(fileobj=response, mode="r|gz") as archive:
+    archive_path = download_archive(LIBRISPEECH_MIRRORS if url == LIBRISPEECH_URL else (url,),
+        root / 'downloads' / 'train-clean-100.tar.gz', LIBRISPEECH_MD5 if url == LIBRISPEECH_URL else None)
+    with tarfile.open(archive_path, mode="r:gz") as archive:
         for member in archive:
             if not member.isfile():
                 continue
@@ -79,6 +160,7 @@ def prepare_english(root, hours=30, clips_per_speaker=40, url=LIBRISPEECH_URL):
     for entry in entries:
         entry["text"] = transcripts.get(entry["source_id"], "")
     write_jsonl(cache, entries)
+    archive_path.unlink()  # The completed source index and retained FLACs are the durable corpus.
     return entries
 
 

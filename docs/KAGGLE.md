@@ -38,6 +38,8 @@ Open `https://www.kaggle.com/code/YOUR_KAGGLE_USERNAME/voicesep-data-preparation
 
 The CPU job selects a bounded corpus, resamples to 8 kHz, splits original speakers, and freezes validation/test recipes. Defaults target up to 30 English and 20 Hindi hours; `preparation.json` records actual retained hours. Access failure or insufficient speakers stops preparation. Do not run a GPU stage before preparation succeeds and its output is saved. Do not make outputs containing publisher-controlled data public.
 
+The original version-4 run stopped on a network timeout while streaming LibriSpeech directly into the archive reader. The replacement first downloads a resumable, checksum-verified archive, then extracts it locally. If retries are exhausted, retain `voicesep-corpus/downloads/*.part` along with any indexed corpus files. Copying that saved output back to the same writable corpus directory enables a later session to resume. Version 4 did not cache compressed bytes, so its partial FLAC output cannot resume that old network stream; the archived Kaggle output remains available.
+
 ## Continue through one training session automatically
 
 After starting preparation through the UI, the local controller can wait for its saved output, validate the corpus, submit the T4 benchmark, and then submit **one** training session. It uses the existing generated jobs; do not regenerate or replace that source snapshot while the controller runs.
@@ -51,6 +53,13 @@ The controller checks disjoint speakers and frozen-manifest hashes before alloca
 Progress is written atomically to `runs/kaggle-workflow/status.json`. Selected reports and checkpoints download to that directory when stages complete; audio stays on Kaggle. The CPU preparation session must complete before its output can be validated. A failed or canceled stage stops the controller. Restart the same command with the same jobs/output directory after resolving a recoverable issue; a lock prevents duplicate local controllers. A completed run does not resubmit itself.
 
 The controller runs on this computer, so it needs the computer running and connected to advance stages. Already submitted Kaggle jobs run remotely. To prevent subsequent submissions, create `runs/kaggle-workflow/STOP`; cancel a currently running remote job through Kaggle's UI. Remove the stop file before intentionally restarting the controller. The final `resume_required` field distinguishes a saved training session from a finished model; quality gates and listening review still apply.
+
+When replacing a failed preparation notebook with corrected source, preserve the failed controller output and start a fresh controller against the new generated jobs. `--after-preparation-version N` waits for a UI-saved run newer than the corrected no-run draft N; it does not pin the failed run or execute the draft without its secret. Use the actual draft version returned by Kaggle:
+
+```sh
+.tools/kaggle/bin/python scripts/run_kaggle_workflow.py --owner YOUR_KAGGLE_USERNAME \
+  --jobs dist/kaggle-retry --output runs/kaggle-workflow --after-preparation-version N
+```
 
 ## Benchmark, then train
 

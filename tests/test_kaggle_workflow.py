@@ -59,7 +59,7 @@ class FakeApi:
         return SimpleNamespace(error='',version_number=1)
 
 
-def make_flow(tmp_path, api):
+def make_flow(tmp_path, api, after_preparation_version=0):
     jobs=tmp_path/'jobs'
     for stage,slug in (('benchmark','voicesep-gpu-benchmark'),('train','voicesep-gpu-training-01')):
         root=jobs/stage
@@ -74,7 +74,8 @@ def make_flow(tmp_path, api):
     def metadata(api, reference):
         return SimpleNamespace(is_private=True,enable_gpu='preparation' not in reference,
                                enable_tpu=False,current_version_number=4)
-    return workflow.Workflow(api,'researcher',jobs,tmp_path/'run',metadata=metadata,poll_seconds=0)
+    return workflow.Workflow(api,'researcher',jobs,tmp_path/'run',metadata=metadata,poll_seconds=0,
+                             after_preparation_version=after_preparation_version)
 
 
 def test_controller_pins_inputs_and_runs_only_one_bounded_training_session(tmp_path):
@@ -130,3 +131,20 @@ def test_output_download_reaches_metadata_after_pages_of_audio_files(tmp_path):
     api.kernels_output=output
     flow.download('researcher/voicesep-data-preparation/4',tmp_path/'metadata',r'preparation.json$')
     assert pages==[None,'next-page']
+
+
+def test_recovery_waits_for_a_new_ui_run_instead_of_reusing_the_failed_version(tmp_path,monkeypatch):
+    api=FakeApi()
+    flow=make_flow(tmp_path,api,after_preparation_version=5)
+    versions=[5,6]
+    def metadata(api,reference):
+        return SimpleNamespace(is_private=True,enable_gpu='preparation' not in reference,
+                               enable_tpu=False,current_version_number=versions[0])
+    def ui_restart(seconds):
+        assert not api.submissions
+        versions.pop(0)
+    flow.metadata=metadata
+    monkeypatch.setattr(workflow.time,'sleep',ui_restart)
+    flow.run()
+    assert flow.state['preparation_kernel']=='researcher/voicesep-data-preparation/6'
+    assert api.submissions[0]['kernel_sources']==['researcher/voicesep-data-preparation/6']

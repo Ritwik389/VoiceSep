@@ -8,6 +8,8 @@ The automated Kaggle path is described in [KAGGLE.md](KAGGLE.md). As checked on 
 
 LibriSpeech: index a training pool such as train-clean-100. For an exact published benchmark reproduction, use its prescribed pools and frozen metadata instead; do not compare custom mixtures as though they were the official Libri5Mix test set.
 
+English bootstrap downloads the archive to `downloads/train-clean-100.tar.gz.part`, reconnects with HTTP Range after interrupted transfers, and rotates through publisher-listed mirrors. It checks the completed archive against [OpenSLR's published MD5](https://www.openslr.org/resources/12/md5sum.txt) before extracting audio locally. Progress reports downloaded bytes as well as retained clips. A server that ignores Range causes a clean restart, never an appended duplicate archive. Exhausted retries keep the partial file for resumption in the same corpus directory. The compressed archive temporarily needs about 6.4 GB in addition to retained clips; it is removed only after the complete English index is saved.
+
 IV-R: use the provided JSONL manifest. Each row must contain `filename`, `speaker_id`, `lang`, and preferably `text`, `duration`, and `snr`. `voicesep index-sources` accepts Hindi codes hi/hin/Hindi and filters supplied SNR values below 10 dB. Missing SNR values are retained for manual QA. IndicVoices-R contains enhanced speech, so inspect enhancement artifacts before treating it as a clean reference.
 
 Normalized source JSONL:

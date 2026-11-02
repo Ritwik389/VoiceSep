@@ -1,10 +1,10 @@
 {
   "release_ready": false,
-  "stage": "cpu_data_preparation_running",
+  "stage": "waiting_for_cpu_ui_restart",
   "five_speaker_checkpoint": null,
   "evaluation_report": null,
   "software_checks": {
-    "python_tests": 25,
+    "python_tests": 33,
     "playback_tests": 3,
     "frontend_build": "passed",
     "official_backbone_sha256_verified": true,
@@ -24,14 +24,17 @@
     "source_loading": "passed",
     "package_installation": "passed",
     "indicvoices_access_preflight": "passed",
-    "status": "cpu_preparation_running",
+    "status": "failed_english_network_timeout",
     "gpu_training_submitted": false
   },
   "local_workflow_controller": {
     "status_file": "runs/kaggle-workflow/status.json",
     "scope": "validate corpus, benchmark, then one bounded training session",
-    "started": true
+    "started": true,
+    "state": "waiting_for_ui_restart",
+    "after_preparation_version": 5
   },
   "verified_on": "2026-11-03",
-  "reason": "The UI-started private CPU job retrieves HF_TOKEN and passes the IndicVoices-R access check. English preparation is underway; the local controller waits for complete corpus validation before submitting GPU work. No trained five-speaker result is available yet."
+  "corrected_preparation_draft_version": 5,
+  "reason": "Preparation version 4 failed on a LibriSpeech socket timeout. Corrected private draft 5 uses byte-range resumption, publisher-mirror retries and checksum verification before local extraction. The recovery controller is waiting for a newer UI-started CPU run; GPU training has not started."
 }

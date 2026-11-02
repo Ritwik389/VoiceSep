@@ -72,13 +72,17 @@ def remote_metadata(api, reference):
 
 
 class Workflow:
-    def __init__(self, api, owner, jobs, output, metadata=remote_metadata, poll_seconds=45):
+    def __init__(self, api, owner, jobs, output, metadata=remote_metadata, poll_seconds=45,
+                 after_preparation_version=0):
         if not re.fullmatch(r'[a-zA-Z0-9_-]+', owner):
             raise ValueError('Expected a Kaggle username')
         self.api, self.owner, self.metadata = api, owner, metadata
         self.jobs, self.output = Path(jobs).resolve(), Path(output).resolve()
         self.output.mkdir(parents=True, exist_ok=True)
         self.poll_seconds = poll_seconds
+        if after_preparation_version < 0:
+            raise ValueError('The previous preparation version cannot be negative')
+        self.after_preparation_version = after_preparation_version
         self.state_path = self.output / 'status.json'
         self.state = json.loads(self.state_path.read_text()) if self.state_path.is_file() else {}
         signatures = {}
@@ -100,7 +104,10 @@ class Workflow:
                 + (directory/'kernel-metadata.json').read_bytes()).hexdigest()
         if self.state and (self.state.get('owner') != owner or self.state.get('jobs') != signatures):
             raise ValueError('Keep the same owner and notebook snapshot when restarting this controller')
-        self.state.update(owner=owner, jobs=signatures, release_ready=False)
+        if self.state.get('after_preparation_version', after_preparation_version) != after_preparation_version:
+            raise ValueError('Keep the same preparation-version boundary when restarting')
+        self.state.update(owner=owner, jobs=signatures, release_ready=False,
+                          after_preparation_version=after_preparation_version)
 
     def save(self, **updates):
         self.state.update(updates, updated_at=datetime.now(timezone.utc).isoformat())
@@ -169,9 +176,15 @@ class Workflow:
             self.save(error=None)
         if not self.state.get('preparation_kernel'):
             reference = f'{self.owner}/voicesep-data-preparation'
-            meta = self.metadata(self.api, reference)
-            if not meta.is_private or meta.enable_gpu or meta.enable_tpu or not meta.current_version_number:
-                raise ValueError('Preparation must be a private, versioned CPU run')
+            while True:
+                self.check_stop()
+                meta = self.metadata(self.api, reference)
+                if not meta.is_private or meta.enable_gpu or meta.enable_tpu or not meta.current_version_number:
+                    raise ValueError('Preparation must be a private, versioned CPU run')
+                if meta.current_version_number > self.after_preparation_version:
+                    break
+                self.save(phase='waiting_for_ui_restart', observed_preparation_version=meta.current_version_number)
+                time.sleep(self.poll_seconds)
             self.save(preparation_kernel=f'{reference}/{meta.current_version_number}', phase='waiting_preparation')
         preparation = self.state['preparation_kernel']
         self.wait(preparation)
@@ -203,6 +216,8 @@ def main():
     parser.add_argument('--owner', required=True)
     parser.add_argument('--jobs', type=Path, default=Path('dist/kaggle'))
     parser.add_argument('--output', type=Path, default=Path('runs/kaggle-workflow'))
+    parser.add_argument('--after-preparation-version', type=int, default=0,
+                        help='Wait for a newer UI-saved preparation version before pinning inputs')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     with (args.output/'controller.lock').open('a') as lock:
@@ -210,7 +225,8 @@ def main():
         from kaggle.api.kaggle_api_extended import KaggleApi
         api = KaggleApi()
         api.authenticate()
-        workflow = Workflow(api, args.owner, args.jobs, args.output)
+        workflow = Workflow(api, args.owner, args.jobs, args.output,
+                            after_preparation_version=args.after_preparation_version)
         try:
             workflow.run()
         except Exception as error:
