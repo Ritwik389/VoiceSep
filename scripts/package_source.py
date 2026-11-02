@@ -6,6 +6,7 @@ root = Path(__file__).resolve().parents[1]
 destination = root / "dist" / "voicesep-source.zip"
 destination.parent.mkdir(exist_ok=True)
 files = [root / name for name in ("README.md", "pyproject.toml", "requirements-tested.txt", "LICENSE", "NOTICE", ".gitignore")]
+files.extend(root / name for name in ("models/README.md", "reports/README.md", "reports/readiness.json", ".github/workflows/checks.yml"))
 for folder in ("src", "configs", "scripts", "notebooks", "docs", "tests", "frontend/src", "frontend/public"):
     files.extend((root / folder).rglob("*"))
 files.extend(root / "frontend" / name for name in ("package.json", "package-lock.json", "index.html", "tsconfig.json", "vite.config.ts"))
