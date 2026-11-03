@@ -59,6 +59,17 @@ def validate(model, source_manifest, recipes_path, device, calibration):
     return float(np.mean([np.mean(values) for values in groups.values()]))
 
 
+def _optimizer_step(model, optimizer, scaler, clip_norm):
+    previous_scale = scaler.get_scale()
+    scaler.unscale_(optimizer)
+    torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm,
+                                   error_if_nonfinite=not scaler.is_enabled())
+    # GradScaler skips the update and lowers its scale when unscale_ detected overflow.
+    scaler.step(optimizer)
+    scaler.update()
+    return scaler.get_scale() >= previous_scale
+
+
 def train(config_path, output_dir, pretrained=None, resume=None, device=None,
           steps_override=None, benchmark=False, segment_seconds=None, max_seconds=None):
     if max_seconds is not None and max_seconds <= 0:
@@ -98,7 +109,7 @@ def train(config_path, output_dir, pretrained=None, resume=None, device=None,
         {"params": [p for p in model.parameters() if id(p) in head_ids], "lr": t["head_lr"]}], weight_decay=t["weight_decay"])
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=2)
     use_amp = t.get("amp", True) and device.startswith("cuda")
-    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp, init_scale=1024)
     step, draw_index, best_score, stale = 0, 0, None, 0
     if resume:
         state = torch.load(resume, map_location="cpu", weights_only=True)
@@ -136,6 +147,8 @@ def train(config_path, output_dir, pretrained=None, resume=None, device=None,
     model.train()
     started = time.perf_counter()
     losses = []
+    completed_draw_index = draw_index
+    skipped_updates = consecutive_overflows = 0
     try:
         while (step < limit and stale < t.get("early_stopping_evaluations", 5)
                and (max_seconds is None or time.perf_counter() - started < max_seconds)):
@@ -154,10 +167,17 @@ def train(config_path, output_dir, pretrained=None, resume=None, device=None,
                     raise FloatingPointError("Non-finite training loss")
                 scaler.scale(loss / t["accumulation"]).backward()
                 total += float(loss.detach()) / t["accumulation"]
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), t["clip_grad_norm"], error_if_nonfinite=True)
-            scaler.step(optimizer)
-            scaler.update()
+            updated = _optimizer_step(model, optimizer, scaler, t["clip_grad_norm"])
+            completed_draw_index = draw_index
+            if not updated:
+                skipped_updates += 1
+                consecutive_overflows += 1
+                print(json.dumps({"amp_overflow_skipped": skipped_updates, "step": step,
+                                  "scale": scaler.get_scale(), "draw_index": draw_index}), flush=True)
+                if consecutive_overflows >= 16:
+                    raise FloatingPointError('Persistent AMP gradient overflow after 16 scale reductions')
+                continue
+            consecutive_overflows = 0
             step += 1
             losses.append(total)
             record = {"step": step, "loss": total, "draw_index": draw_index,
@@ -184,11 +204,12 @@ def train(config_path, output_dir, pretrained=None, resume=None, device=None,
     finally:
         # Saves only completed optimizer steps; an interrupted accumulation is replayed from its step boundary.
         save_checkpoint(output_dir / "last.pt", model, optimizer, scheduler, scaler, step,
-                        step * t["accumulation"], config, best_score, stale=stale)
+                        completed_draw_index, config, best_score, stale=stale)
     report = {"completed_steps": step, "steps_this_run": len(losses),
               "seconds_per_step": (time.perf_counter() - started) / max(len(losses), 1),
               "peak_cuda_memory_bytes": torch.cuda.max_memory_allocated() if device.startswith("cuda") else None,
               "device": device, "benchmark_only": benchmark, "release_ready": False,
+              "amp_skipped_updates": skipped_updates,
               "stopped_for_time_budget": max_seconds is not None and step < limit
               and time.perf_counter() - started >= max_seconds}
     (output_dir / "throughput.json").write_text(json.dumps(report, indent=2))

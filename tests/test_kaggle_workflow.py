@@ -33,6 +33,9 @@ class FakeApi:
         self.submissions=[]
         self.fail_benchmark=False
 
+    def authenticate(self):
+        pass
+
     def kernels_status(self, reference):
         return SimpleNamespace(status=SimpleNamespace(name='ERROR' if self.fail_benchmark and 'benchmark' in reference else 'COMPLETE'))
 
@@ -148,3 +151,22 @@ def test_recovery_waits_for_a_new_ui_run_instead_of_reusing_the_failed_version(t
     flow.run()
     assert flow.state['preparation_kernel']=='researcher/voicesep-data-preparation/6'
     assert api.submissions[0]['kernel_sources']==['researcher/voicesep-data-preparation/6']
+
+
+def test_long_lived_status_poll_reloads_credentials_after_the_wait(tmp_path,monkeypatch):
+    api=FakeApi()
+    flow=make_flow(tmp_path,api)
+    state={'fresh':False,'auth_calls':0,'status_calls':0}
+    def authenticate():
+        state['fresh']=True
+        state['auth_calls']+=1
+    def status(reference):
+        if not state['fresh']:
+            raise ValueError('Permission kernels.get denied: stale credentials')
+        state['status_calls']+=1
+        return SimpleNamespace(status=SimpleNamespace(name='RUNNING' if state['status_calls']==1 else 'COMPLETE'))
+    api.authenticate=authenticate
+    api.kernels_status=status
+    monkeypatch.setattr(workflow.time,'sleep',lambda seconds:state.update(fresh=False))
+    flow.wait('researcher/voicesep-data-preparation/6')
+    assert state['auth_calls']==state['status_calls']==2

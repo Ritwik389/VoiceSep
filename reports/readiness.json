@@ -1,10 +1,10 @@
 {
   "release_ready": false,
-  "stage": "cpu_preparation_recovery_running",
+  "stage": "gpu_benchmark_running",
   "five_speaker_checkpoint": null,
   "evaluation_report": null,
   "software_checks": {
-    "python_tests": 33,
+    "python_tests": 36,
     "kaggle_downloader_tests": 7,
     "kaggle_http_range_probe": "passed",
     "playback_tests": 3,
@@ -26,17 +26,31 @@
     "source_loading": "passed",
     "package_installation": "passed",
     "indicvoices_access_preflight": "passed",
-    "status": "resumable_english_download_running",
+    "status": "complete",
     "gpu_training_submitted": false
   },
   "local_workflow_controller": {
     "status_file": "runs/kaggle-workflow/status.json",
     "scope": "validate corpus, benchmark, then one bounded training session",
     "started": true,
-    "state": "waiting_preparation",
+    "state": "waiting_benchmark",
     "after_preparation_version": 5
   },
   "verified_on": "2026-11-03",
   "corrected_preparation_draft_version": 5,
-  "reason": "Recovery version 6 is running with the corrected downloader and has saved archive bytes to disk. The controller is pinned to version 6. Seven downloader tests and a live range request also passed on Kaggle CPU. Full corpus preparation and GPU training remain pending."
+  "reason": "Corpus preparation and integrity checks are complete. GPU benchmark version 2 has made a finite optimizer update after the AMP correction. Full 100-update benchmarking, fine-tuning and held-out evaluation remain pending.",
+  "prepared_corpus": {
+    "sample_rate": 8000,
+    "english_hours": 30.0017175,
+    "hindi_hours": 20.001446041666664,
+    "speaker_disjoint_checks": "passed",
+    "frozen_manifest_checks": "passed"
+  },
+  "gpu_benchmark": {
+    "kernel": "ritwik8307/voicesep-gpu-benchmark/2",
+    "device": "Tesla T4",
+    "status": "running",
+    "first_optimizer_update": "passed",
+    "required_successful_updates": 100
+  }
 }

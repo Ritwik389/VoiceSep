@@ -42,3 +42,22 @@ def test_optimizer_resume_matches_uninterrupted_training(tmp_path, monkeypatch):
     stopped=torch.load(tmp_path/'time-limited/last.pt',weights_only=True)
     assert report['stopped_for_time_budget'] is True
     assert stopped['step']==0 and stopped['draw_index']==0 and stopped['trained'] is False
+    original_step=trainer._optimizer_step
+    def skip_first_update():
+        calls=0
+        def apply(*args):
+            nonlocal calls
+            calls+=1
+            return False if calls==1 else original_step(*args)
+        return apply
+    monkeypatch.setattr(trainer,'_optimizer_step',skip_first_update())
+    train(path,tmp_path/'whole-skipped',pretrained='fixture',device='cpu')
+    monkeypatch.setattr(trainer,'_optimizer_step',skip_first_update())
+    train(path,tmp_path/'partial-skipped',pretrained='fixture',device='cpu',steps_override=1)
+    monkeypatch.setattr(trainer,'_optimizer_step',original_step)
+    train(path,tmp_path/'resumed-skipped',resume=tmp_path/'partial-skipped/last.pt',device='cpu')
+    a=torch.load(tmp_path/'whole-skipped/last.pt',weights_only=True)
+    b=torch.load(tmp_path/'resumed-skipped/last.pt',weights_only=True)
+    assert a['draw_index']==b['draw_index']==3
+    assert a['step']==b['step']==2
+    assert all(torch.equal(a['model'][key],b['model'][key]) for key in a['model'])

@@ -64,6 +64,7 @@ def validate_benchmark(folder):
 
 def remote_metadata(api, reference):
     from kagglesdk.kernels.types.kernels_api_service import ApiGetKernelRequest
+    api.authenticate()  # Reload/refresh cached credentials in long-lived controllers.
     owner, slug, *_ = reference.split('/')
     request = ApiGetKernelRequest()
     request.user_name, request.kernel_slug = owner, slug
@@ -123,6 +124,7 @@ class Workflow:
     def wait(self, reference):
         while True:
             self.check_stop()
+            self.api.authenticate()
             status = self.api.kernels_status(reference).status.name
             if self.state.get('remote_status') != status or self.state.get('current_kernel') != reference:
                 self.save(current_kernel=reference, remote_status=status)
@@ -136,6 +138,7 @@ class Workflow:
         token = None
         while True:
             self.check_stop()
+            self.api.authenticate()
             _, token = self.api.kernels_output(reference, str(destination), file_pattern=pattern, force=True,
                                               quiet=True, page_size=200, page_token=token)
             if not token:
@@ -147,6 +150,7 @@ class Workflow:
             return self.state[f'{stage}_kernel']
         if self.state.get('phase') == f'submitting_{stage}':
             raise RuntimeError('Previous submission response was interrupted; inspect Kaggle before retrying')
+        self.api.authenticate()
         quota = self.api.quota_view().gpu_quota
         remaining = ((quota.total_time_allowed-quota.time_used).total_seconds()/3600) if quota else 0
         if remaining < required_hours:
