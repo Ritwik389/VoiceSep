@@ -1,10 +1,10 @@
 {
   "release_ready": false,
-  "stage": "gpu_benchmark_running",
+  "stage": "fine_tuning_running",
   "five_speaker_checkpoint": null,
   "evaluation_report": null,
   "software_checks": {
-    "python_tests": 36,
+    "python_tests": 37,
     "kaggle_downloader_tests": 7,
     "kaggle_http_range_probe": "passed",
     "playback_tests": 3,
@@ -33,12 +33,12 @@
     "status_file": "runs/kaggle-workflow/status.json",
     "scope": "validate corpus, benchmark, then one bounded training session",
     "started": true,
-    "state": "waiting_benchmark",
+    "state": "waiting_train",
     "after_preparation_version": 5
   },
   "verified_on": "2026-11-03",
   "corrected_preparation_draft_version": 5,
-  "reason": "Corpus preparation and integrity checks are complete. GPU benchmark version 2 has made a finite optimizer update after the AMP correction. Full 100-update benchmarking, fine-tuning and held-out evaluation remain pending.",
+  "reason": "The first fine-tuning session is running. Logged batch losses improve overall but vary with fresh mixture composition. Fixed validation metrics and held-out quality gates remain unverified; no release is ready.",
   "prepared_corpus": {
     "sample_rate": 8000,
     "english_hours": 30.0017175,
@@ -49,8 +49,18 @@
   "gpu_benchmark": {
     "kernel": "ritwik8307/voicesep-gpu-benchmark/2",
     "device": "Tesla T4",
-    "status": "running",
+    "status": "passed",
     "first_optimizer_update": "passed",
-    "required_successful_updates": 100
+    "required_successful_updates": 100,
+    "completed_updates": 100,
+    "seconds_per_step": 9.099648419929999,
+    "peak_cuda_memory_bytes": 5045269504
+  },
+  "training_job": {
+    "kernel": "ritwik8307/voicesep-gpu-training-01/1",
+    "status": "running",
+    "last_analyzed_step": 2390,
+    "recent_logged_mean_loss": -4.1518258318108945,
+    "validation_quality_verified": false
   }
 }

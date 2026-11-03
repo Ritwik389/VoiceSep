@@ -28,3 +28,7 @@ The browser was inspected through the supported desktop browser tools; the desig
 - Completed CPU corpus preparation, GPU memory/throughput results, and resumable training across saved notebook outputs. No model-quality achievement is claimed.
 
 The locally available execution device has neither CUDA nor MPS. A SciPy 1.15 native-library loader failure on this Mac was resolved by using project-local SciPy 1.13.1; the conditional dependency preserves that known-compatible version for this Python/macOS combination. Test warnings from the pinned upstream rotary/attention APIs are deprecations rather than test failures.
+
+The 100-update T4 benchmark subsequently passed with four-second crops, 9.10 seconds/update and 5,045,269,504 peak allocated CUDA bytes. The first fine-tuning session is running. Log analysis through step 2390 shows improvement from early positive losses to a recent logged-batch mean near -4.15, with substantial mixture-dependent variation. The current run saves validation selection scores in checkpoints but does not print them; validation-score/LR logging is added for future resumed sessions. No held-out speech-quality claim follows from these training losses.
+
+A local DNS failure stopped the earlier monitor without affecting remote training. Read-only operations now wait and recover from network errors; mutation submissions remain protected against duplicate retries. The recovery regression check and all 37 Python tests pass.

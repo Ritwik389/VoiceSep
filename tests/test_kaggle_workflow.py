@@ -170,3 +170,20 @@ def test_long_lived_status_poll_reloads_credentials_after_the_wait(tmp_path,monk
     monkeypatch.setattr(workflow.time,'sleep',lambda seconds:state.update(fresh=False))
     flow.wait('researcher/voicesep-data-preparation/6')
     assert state['auth_calls']==state['status_calls']==2
+
+
+def test_dns_outage_retries_read_without_resubmitting_a_gpu_job(tmp_path,monkeypatch):
+    api=FakeApi();flow=make_flow(tmp_path,api)
+    calls=0
+    def status(reference):
+        nonlocal calls
+        calls+=1
+        if calls==1:
+            raise OSError('Temporary DNS lookup failure')
+        return SimpleNamespace(status=SimpleNamespace(name='COMPLETE'))
+    api.kernels_status=status
+    monkeypatch.setattr(workflow.time,'sleep',lambda seconds:None)
+    flow.wait('researcher/voicesep-gpu-training-01/1')
+    assert calls==2 and not api.submissions
+    assert flow.state['connection_error'] is None
+    assert flow.state['remote_status']=='COMPLETE'

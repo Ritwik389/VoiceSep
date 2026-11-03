@@ -121,11 +121,26 @@ class Workflow:
         if (self.output/'STOP').exists():
             raise InterruptedError('STOP file present; no further stages will be submitted')
 
+    def read(self, operation, *args, **kwargs):
+        # Network interruptions must not abandon an already-running remote job.
+        # Submission mutations deliberately do not use this retry loop.
+        while True:
+            self.check_stop()
+            try:
+                self.api.authenticate()
+                result = operation(*args, **kwargs)
+                if self.state.get('connection_error'):
+                    self.save(connection_error=None)
+                return result
+            except OSError as error:
+                message = re.sub(r'hf_[A-Za-z0-9]+', '[redacted HF token]', str(error))
+                self.save(connection_error=message)
+                time.sleep(self.poll_seconds)
+
     def wait(self, reference):
         while True:
             self.check_stop()
-            self.api.authenticate()
-            status = self.api.kernels_status(reference).status.name
+            status = self.read(self.api.kernels_status, reference).status.name
             if self.state.get('remote_status') != status or self.state.get('current_kernel') != reference:
                 self.save(current_kernel=reference, remote_status=status)
             if status == 'COMPLETE':
@@ -138,9 +153,8 @@ class Workflow:
         token = None
         while True:
             self.check_stop()
-            self.api.authenticate()
-            _, token = self.api.kernels_output(reference, str(destination), file_pattern=pattern, force=True,
-                                              quiet=True, page_size=200, page_token=token)
+            _, token = self.read(self.api.kernels_output, reference, str(destination), file_pattern=pattern,
+                                 force=True, quiet=True, page_size=200, page_token=token)
             if not token:
                 break
 
@@ -150,8 +164,7 @@ class Workflow:
             return self.state[f'{stage}_kernel']
         if self.state.get('phase') == f'submitting_{stage}':
             raise RuntimeError('Previous submission response was interrupted; inspect Kaggle before retrying')
-        self.api.authenticate()
-        quota = self.api.quota_view().gpu_quota
+        quota = self.read(self.api.quota_view).gpu_quota
         remaining = ((quota.total_time_allowed-quota.time_used).total_seconds()/3600) if quota else 0
         if remaining < required_hours:
             raise RuntimeError(f'Insufficient free GPU quota: {remaining:.2f} hours remain')
@@ -167,7 +180,7 @@ class Workflow:
             raise RuntimeError(f'Kaggle rejected {stage}: {response.error or "missing version number"}')
         reference = f'{meta["id"]}/{response.version_number}'
         self.save(**{f'{stage}_kernel': reference}, phase=f'waiting_{stage}')
-        deployed = self.metadata(self.api, meta['id'])
+        deployed = self.read(self.metadata, self.api, meta['id'])
         if not deployed.is_private or not deployed.enable_gpu or deployed.enable_tpu:
             raise RuntimeError('Remote job metadata does not match the private GPU settings')
         return reference
@@ -182,7 +195,7 @@ class Workflow:
             reference = f'{self.owner}/voicesep-data-preparation'
             while True:
                 self.check_stop()
-                meta = self.metadata(self.api, reference)
+                meta = self.read(self.metadata, self.api, reference)
                 if not meta.is_private or meta.enable_gpu or meta.enable_tpu or not meta.current_version_number:
                     raise ValueError('Preparation must be a private, versioned CPU run')
                 if meta.current_version_number > self.after_preparation_version:
@@ -193,7 +206,8 @@ class Workflow:
         preparation = self.state['preparation_kernel']
         self.wait(preparation)
         corpus = self.output/'corpus-metadata'
-        self.download(preparation, corpus, r'voicesep-corpus/(preparation\.json|(train|validation|test)(-mixtures)?\.jsonl)$')
+        if not self.state.get('corpus_validated') or not list(corpus.rglob('preparation.json')):
+            self.download(preparation, corpus, r'voicesep-corpus/(preparation\.json|(train|validation|test)(-mixtures)?\.jsonl)$')
         report = validate_corpus(corpus)
         self.save(corpus_hours=report.get('hours'), corpus_validated=True)
         benchmark = self.submit('benchmark', [preparation], required_hours=2, timeout=3600)
@@ -206,7 +220,7 @@ class Workflow:
         training = self.submit('train', [preparation, benchmark], required_hours=16, timeout=28800)
         self.wait(training)
         results = self.output/'training'
-        self.download(training, results, r'(run-summary\.json|throughput\.json|last\.pt|best\.pt|best-calibrated\.pt|train\.ya?ml|train\.jsonl|evaluation/.*\.(json|md))$')
+        self.download(training, results, r'(run-summary\.json|throughput\.json|last\.pt|best\.pt|best-calibrated\.pt|train\.ya?ml|train\.jsonl|validation\.jsonl|evaluation/.*\.(json|md))$')
         summaries = list(results.rglob('run-summary.json'))
         if len(summaries) != 1:
             raise ValueError('Training output is missing its final run summary')

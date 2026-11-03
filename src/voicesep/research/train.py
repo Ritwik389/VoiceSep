@@ -189,6 +189,11 @@ def train(config_path, output_dir, pretrained=None, resume=None, device=None,
             if not benchmark and step % t["validate_every"] == 0:
                 score = validate(model, validation_source, validation_path, device, config.get("calibration", {}))
                 scheduler.step(score)
+                validation_record = {"step": step, "validation_balanced_score": score,
+                                     "learning_rates": [group['lr'] for group in optimizer.param_groups]}
+                with (output_dir / 'validation.jsonl').open('a') as log:
+                    log.write(json.dumps(validation_record) + '\n')
+                print(json.dumps(validation_record), flush=True)
                 if best_score is None or score > best_score + 0.05:
                     best_score, stale = score, 0
                     save_checkpoint(output_dir / "best.pt", model, optimizer, scheduler, scaler,
