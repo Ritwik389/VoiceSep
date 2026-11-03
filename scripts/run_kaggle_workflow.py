@@ -133,6 +133,7 @@ class Workflow:
     def read(self, operation, *args, **kwargs):
         # Network interruptions must not abandon an already-running remote job.
         # Submission mutations deliberately do not use this retry loop.
+        access_retries = 0
         while True:
             self.check_stop()
             try:
@@ -144,6 +145,14 @@ class Workflow:
             except OSError as error:
                 message = re.sub(r'hf_[A-Za-z0-9]+', '[redacted HF token]', str(error))
                 self.save(connection_error=message)
+                time.sleep(self.poll_seconds)
+            except ValueError as error:
+                # The CLI wraps transient 401/403 read responses as ValueError.
+                # Retry with reloaded credentials, but keep persistent denials terminal.
+                if "Permission 'kernels.get'" not in str(error) or access_retries >= 2:
+                    raise
+                access_retries += 1
+                self.save(connection_error=str(error), access_read_retry=access_retries)
                 time.sleep(self.poll_seconds)
 
     def wait(self, reference):

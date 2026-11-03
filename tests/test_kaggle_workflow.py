@@ -206,3 +206,25 @@ def test_resume_uses_existing_benchmark_and_pins_previous_training_output(tmp_pa
 def test_resume_rejects_an_unpinned_or_different_account_parent(tmp_path):
     with pytest.raises(ValueError,match='Pin the preceding'):
         make_flow(tmp_path,FakeApi(),run_number=2,resume_kernel='someone/voicesep-gpu-training-01/1')
+
+
+@pytest.mark.parametrize('persistent',[False,True])
+def test_access_read_retry_is_bounded_and_never_resubmits_training(tmp_path,monkeypatch,persistent):
+    api=FakeApi();flow=make_flow(tmp_path,api)
+    calls=0
+    def status(reference):
+        nonlocal calls
+        calls+=1
+        if persistent or calls==1:
+            raise ValueError("Cannot access kernel (Permission 'kernels.get' was denied)")
+        return SimpleNamespace(status=SimpleNamespace(name='COMPLETE'))
+    api.kernels_status=status
+    monkeypatch.setattr(workflow.time,'sleep',lambda seconds:None)
+    if persistent:
+        with pytest.raises(ValueError,match='Permission'):
+            flow.wait('researcher/voicesep-gpu-training-02/1')
+        assert calls==3
+    else:
+        flow.wait('researcher/voicesep-gpu-training-02/1')
+        assert calls==2 and flow.state['connection_error'] is None
+    assert not api.submissions

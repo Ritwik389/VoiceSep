@@ -38,7 +38,7 @@
   },
   "verified_on": "2026-11-03",
   "corrected_preparation_draft_version": 5,
-  "reason": "Session 1 ended at its wall-time budget with a readable checkpoint at step 2877. Session 2 restored configuration, corpus fingerprints, model, optimizer and scaler state and has advanced to step 2880. Held-out quality gates remain unverified.",
+  "reason": "Session 2 is running beyond step 5450. The best validation selection score is 8.73 at step 4000; step 5000 did not improve it. Early-stopping patience is 1/5; held-out quality gates remain unverified.",
   "prepared_corpus": {
     "sample_rate": 8000,
     "english_hours": 30.0017175,
@@ -60,8 +60,13 @@
     "kernel": "ritwik8307/voicesep-gpu-training-02/1",
     "status": "running",
     "resumed_from_step": 2877,
-    "last_verified_step": 2880,
-    "validation_quality_verified": false
+    "last_verified_step": 5450,
+    "validation_quality_verified": false,
+    "best_validation_step": 4000,
+    "best_validation_selection_score": 8.730274399635382,
+    "latest_validation_step": 5000,
+    "latest_validation_selection_score": 7.443824788609312,
+    "early_stopping_stale_checks": 1
   },
   "first_training_session": {
     "kernel": "ritwik8307/voicesep-gpu-training-01/1",
