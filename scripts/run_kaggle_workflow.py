@@ -74,10 +74,16 @@ def remote_metadata(api, reference):
 
 class Workflow:
     def __init__(self, api, owner, jobs, output, metadata=remote_metadata, poll_seconds=45,
-                 after_preparation_version=0):
+                 after_preparation_version=0, run_number=1, resume_kernel=None):
         if not re.fullmatch(r'[a-zA-Z0-9_-]+', owner):
             raise ValueError('Expected a Kaggle username')
         self.api, self.owner, self.metadata = api, owner, metadata
+        if run_number < 1 or (run_number == 1 and resume_kernel) or (run_number > 1 and not resume_kernel):
+            raise ValueError('A later run number requires its completed parent training kernel')
+        if resume_kernel and not re.fullmatch(
+                rf'{re.escape(owner)}/voicesep-gpu-training-{run_number-1:02}/[1-9][0-9]*', resume_kernel):
+            raise ValueError('Pin the preceding training run version from the same Kaggle account')
+        self.run_number, self.resume_kernel = run_number, resume_kernel
         self.jobs, self.output = Path(jobs).resolve(), Path(output).resolve()
         self.output.mkdir(parents=True, exist_ok=True)
         self.poll_seconds = poll_seconds
@@ -87,7 +93,7 @@ class Workflow:
         self.state_path = self.output / 'status.json'
         self.state = json.loads(self.state_path.read_text()) if self.state_path.is_file() else {}
         signatures = {}
-        for stage, slug in (('benchmark', 'voicesep-gpu-benchmark'), ('train', 'voicesep-gpu-training-01')):
+        for stage, slug in (('benchmark', 'voicesep-gpu-benchmark'), ('train', f'voicesep-gpu-training-{run_number:02}')):
             directory = self.jobs / stage
             meta = json.loads((directory / 'kernel-metadata.json').read_text())
             if (meta['id'] != f'{owner}/{slug}' or meta.get('is_private') is not True
@@ -99,6 +105,8 @@ class Workflow:
             expected = [f'{owner}/voicesep-data-preparation']
             if stage == 'train':
                 expected.append(f'{owner}/voicesep-gpu-benchmark')
+                if resume_kernel:
+                    expected.append(resume_kernel)
             if meta.get('kernel_sources') != expected or meta['code_file'] != 'job.ipynb':
                 raise ValueError('Unexpected notebook inputs or code file')
             signatures[stage] = hashlib.sha256((directory/'job.ipynb').read_bytes()
@@ -108,7 +116,8 @@ class Workflow:
         if self.state.get('after_preparation_version', after_preparation_version) != after_preparation_version:
             raise ValueError('Keep the same preparation-version boundary when restarting')
         self.state.update(owner=owner, jobs=signatures, release_ready=False,
-                          after_preparation_version=after_preparation_version)
+                          after_preparation_version=after_preparation_version,
+                          run_number=run_number, resume_kernel=resume_kernel)
 
     def save(self, **updates):
         self.state.update(updates, updated_at=datetime.now(timezone.utc).isoformat())
@@ -217,7 +226,14 @@ class Workflow:
         choice = validate_benchmark(results)
         self.save(benchmark=choice)
         # Reserve conservatively for two allocated T4s, even though this model uses one.
-        training = self.submit('train', [preparation, benchmark], required_hours=16, timeout=28800)
+        inputs = [preparation, benchmark]
+        if self.resume_kernel:
+            parent = self.read(self.metadata, self.api, self.resume_kernel)
+            if not parent.is_private or not parent.enable_gpu or parent.enable_tpu:
+                raise ValueError('Resume parent must be a private GPU training run')
+            self.wait(self.resume_kernel)
+            inputs.append(self.resume_kernel)
+        training = self.submit('train', inputs, required_hours=16, timeout=28800)
         self.wait(training)
         results = self.output/'training'
         self.download(training, results, r'(run-summary\.json|throughput\.json|last\.pt|best\.pt|best-calibrated\.pt|train\.ya?ml|train\.jsonl|validation\.jsonl|evaluation/.*\.(json|md))$')
@@ -236,6 +252,8 @@ def main():
     parser.add_argument('--output', type=Path, default=Path('runs/kaggle-workflow'))
     parser.add_argument('--after-preparation-version', type=int, default=0,
                         help='Wait for a newer UI-saved preparation version before pinning inputs')
+    parser.add_argument('--run-number', type=int, default=1)
+    parser.add_argument('--resume-kernel', help='Pinned preceding training kernel, e.g. owner/voicesep-gpu-training-01/1')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     with (args.output/'controller.lock').open('a') as lock:
@@ -244,7 +262,8 @@ def main():
         api = KaggleApi()
         api.authenticate()
         workflow = Workflow(api, args.owner, args.jobs, args.output,
-                            after_preparation_version=args.after_preparation_version)
+                            after_preparation_version=args.after_preparation_version,
+                            run_number=args.run_number, resume_kernel=args.resume_kernel)
         try:
             workflow.run()
         except Exception as error:

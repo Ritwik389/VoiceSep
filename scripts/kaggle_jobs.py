@@ -139,7 +139,7 @@ text = yaml.safe_dump(config, sort_keys=False)
 previous = sorted(Path('/kaggle/input').rglob('last.pt'))
 # Ignore benchmark weights; only resume checkpoints accompanied by the saved training config.
 previous = [path for path in previous if (path.parent.parent / 'train.yaml').is_file()]
-assert len(previous) <= 1, 'Attach only one previous VoiceSep training output.'
+assert len(previous) == EXPECTED_PARENT_COUNT, 'Resume requires exactly one saved parent checkpoint; a fresh run requires none.'
 if previous:
     saved_config = previous[0].parent.parent / 'train.yaml'
     assert saved_config.read_text() == text, 'Resume config differs from this job.'
@@ -163,6 +163,7 @@ if finished:
 else:
     print('Save this output and attach it to the next private training job to resume. Held-out test evaluation has not run.')
 '''
+    training = training.replace('EXPECTED_PARENT_COUNT', '1' if resume_kernel else '0')
     stages = {
         "prepare": ("VoiceSep data preparation", False, [], [setup, preparation]),
         "benchmark": ("VoiceSep GPU benchmark", True, [f"{owner}/voicesep-data-preparation"], [setup, mount_data, benchmark]),

@@ -66,6 +66,9 @@ def test_generated_kaggle_jobs_are_private_compilable_and_cpu_first(tmp_path, mo
     training = json.loads((tmp_path / "jobs/train/kernel-metadata.json").read_text())
     assert training["id"] == "researcher/voicesep-gpu-training-02"
     assert "researcher/voicesep-gpu-training-01" in training["kernel_sources"]
+    training_code=''.join(''.join(cell['source']) for cell in
+        json.loads((tmp_path/'jobs/train/job.ipynb').read_text())['cells'] if cell['cell_type']=='code')
+    assert 'assert len(previous) == 1' in training_code
     with pytest.raises(ValueError):
         module.build("not a username", tmp_path / "invalid")
 

@@ -62,14 +62,15 @@ class FakeApi:
         return SimpleNamespace(error='',version_number=1)
 
 
-def make_flow(tmp_path, api, after_preparation_version=0):
+def make_flow(tmp_path, api, after_preparation_version=0, run_number=1, resume_kernel=None):
     jobs=tmp_path/'jobs'
-    for stage,slug in (('benchmark','voicesep-gpu-benchmark'),('train','voicesep-gpu-training-01')):
+    for stage,slug in (('benchmark','voicesep-gpu-benchmark'),('train',f'voicesep-gpu-training-{run_number:02}')):
         root=jobs/stage
         root.mkdir(parents=True)
         (root/'job.ipynb').write_text('{}')
         inputs=['researcher/voicesep-data-preparation']
         if stage=='train': inputs.append('researcher/voicesep-gpu-benchmark')
+        if stage=='train' and resume_kernel: inputs.append(resume_kernel)
         (root/'kernel-metadata.json').write_text(json.dumps({'id':f'researcher/{slug}',
             'is_private':True,'enable_gpu':True,'machine_shape':'NvidiaTeslaT4',
             'dataset_sources':['researcher/voicesep-research-source'],'kernel_sources':inputs,
@@ -78,7 +79,8 @@ def make_flow(tmp_path, api, after_preparation_version=0):
         return SimpleNamespace(is_private=True,enable_gpu='preparation' not in reference,
                                enable_tpu=False,current_version_number=4)
     return workflow.Workflow(api,'researcher',jobs,tmp_path/'run',metadata=metadata,poll_seconds=0,
-                             after_preparation_version=after_preparation_version)
+                             after_preparation_version=after_preparation_version,
+                             run_number=run_number,resume_kernel=resume_kernel)
 
 
 def test_controller_pins_inputs_and_runs_only_one_bounded_training_session(tmp_path):
@@ -187,3 +189,20 @@ def test_dns_outage_retries_read_without_resubmitting_a_gpu_job(tmp_path,monkeyp
     assert calls==2 and not api.submissions
     assert flow.state['connection_error'] is None
     assert flow.state['remote_status']=='COMPLETE'
+
+
+def test_resume_uses_existing_benchmark_and_pins_previous_training_output(tmp_path):
+    api=FakeApi()
+    parent='researcher/voicesep-gpu-training-01/1'
+    flow=make_flow(tmp_path,api,run_number=2,resume_kernel=parent)
+    flow.state['benchmark_kernel']='researcher/voicesep-gpu-benchmark/1'
+    flow.run()
+    assert len(api.submissions)==1
+    assert api.submissions[0]['id']=='researcher/voicesep-gpu-training-02'
+    assert api.submissions[0]['kernel_sources'][-1]==parent
+    assert flow.state['phase']=='session_complete'
+
+
+def test_resume_rejects_an_unpinned_or_different_account_parent(tmp_path):
+    with pytest.raises(ValueError,match='Pin the preceding'):
+        make_flow(tmp_path,FakeApi(),run_number=2,resume_kernel='someone/voicesep-gpu-training-01/1')

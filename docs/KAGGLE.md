@@ -102,3 +102,9 @@ Download the saved output:
 ```
 
 Inspect the evaluation before installing `voicesep-checkpoints/best-calibrated.pt` locally. The presence of a checkpoint alone does not establish the four/five-speaker quality gates. Keep training audio and checkpoints out of Git; publish permitted model assets separately only after evaluation and license review.
+
+## Monitoring a resumed session
+
+Use `--run-number 2 --resume-kernel YOUR_KAGGLE_USERNAME/voicesep-gpu-training-01/1` when constructing a session-2 controller, with the matching generated jobs and a fresh output directory. The parent must be a pinned version of the preceding private training run in the same account. Completed corpus/benchmark references can be reused; each controller submits at most one new training session. The resume notebook requires exactly one parent checkpoint and rejects configuration or corpus changes instead of silently starting over.
+
+The first completed run reached step 2877. Session 2 was verified on the T4 at step 2880 with mixture index 23072, continuing from the saved index 23048. Current monitoring output is `runs/kaggle-session-02/status.json`; session-1 checkpoint files remain in `runs/kaggle-workflow/training/voicesep-checkpoints/`.

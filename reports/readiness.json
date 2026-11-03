@@ -4,7 +4,7 @@
   "five_speaker_checkpoint": null,
   "evaluation_report": null,
   "software_checks": {
-    "python_tests": 37,
+    "python_tests": 39,
     "kaggle_downloader_tests": 7,
     "kaggle_http_range_probe": "passed",
     "playback_tests": 3,
@@ -30,7 +30,7 @@
     "gpu_training_submitted": false
   },
   "local_workflow_controller": {
-    "status_file": "runs/kaggle-workflow/status.json",
+    "status_file": "runs/kaggle-session-02/status.json",
     "scope": "validate corpus, benchmark, then one bounded training session",
     "started": true,
     "state": "waiting_train",
@@ -38,7 +38,7 @@
   },
   "verified_on": "2026-11-03",
   "corrected_preparation_draft_version": 5,
-  "reason": "The first fine-tuning session is running. Logged batch losses improve overall but vary with fresh mixture composition. Fixed validation metrics and held-out quality gates remain unverified; no release is ready.",
+  "reason": "Session 1 ended at its wall-time budget with a readable checkpoint at step 2877. Session 2 restored configuration, corpus fingerprints, model, optimizer and scaler state and has advanced to step 2880. Held-out quality gates remain unverified.",
   "prepared_corpus": {
     "sample_rate": 8000,
     "english_hours": 30.0017175,
@@ -57,10 +57,18 @@
     "peak_cuda_memory_bytes": 5045269504
   },
   "training_job": {
-    "kernel": "ritwik8307/voicesep-gpu-training-01/1",
+    "kernel": "ritwik8307/voicesep-gpu-training-02/1",
     "status": "running",
-    "last_analyzed_step": 2390,
-    "recent_logged_mean_loss": -4.1518258318108945,
+    "resumed_from_step": 2877,
+    "last_verified_step": 2880,
     "validation_quality_verified": false
+  },
+  "first_training_session": {
+    "kernel": "ritwik8307/voicesep-gpu-training-01/1",
+    "completed_steps": 2877,
+    "resume_required": true,
+    "last_checkpoint_sha256": "e4b7679aa9fd907f53c4cda7e2b2fca8ffcd7587b417ffea8a47a32056d2fe18",
+    "best_checkpoint_step": 2000,
+    "validation_selection_score": 4.018352616175803
   }
 }
