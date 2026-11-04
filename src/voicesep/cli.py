@@ -116,10 +116,11 @@ def freeze(manifest: Path, destination: Path, per_condition: int = 100, seconds:
 def training(config: Path = Path("configs/train.yaml"), output: Path = Path("runs/tflocoformer"),
              pretrained: Path | None = None, resume: Path | None = None, device: str | None = None,
              steps: int | None = None, benchmark: bool = False, segment_seconds: float | None = None,
-             max_seconds: int | None = None):
+             max_seconds: int | None = None, microbatch_size: int = 1, data_parallel: bool = False):
     """Fine-tune, resume, or benchmark 100 steps. Free GPU notebooks are supplied."""
     from .research.train import train
-    emit(train(config, output, pretrained, resume, device, steps, benchmark, segment_seconds, max_seconds))
+    emit(train(config, output, pretrained, resume, device, steps, benchmark, segment_seconds, max_seconds,
+               microbatch_size, data_parallel))
 
 
 @app.command("calibrate")

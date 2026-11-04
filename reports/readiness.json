@@ -1,10 +1,10 @@
 {
   "release_ready": false,
-  "stage": "fine_tuning_running",
+  "stage": "fine_tuning_budgeted",
   "five_speaker_checkpoint": null,
   "evaluation_report": null,
   "software_checks": {
-    "python_tests": 39,
+    "python_tests": 46,
     "kaggle_downloader_tests": 7,
     "kaggle_http_range_probe": "passed",
     "playback_tests": 3,
@@ -30,15 +30,15 @@
     "gpu_training_submitted": false
   },
   "local_workflow_controller": {
-    "status_file": "runs/kaggle-session-02/status.json",
-    "scope": "validate corpus, benchmark, then one bounded training session",
+    "status_file": "runs/kaggle-quota-finish/status.json",
+    "scope": "bounded continuation, validation calibration, held-out evaluation, artifact download",
     "started": true,
-    "state": "waiting_train",
+    "state": "waiting_session_03",
     "after_preparation_version": 5
   },
-  "verified_on": "2026-11-03",
+  "verified_on": "2026-11-04",
   "corrected_preparation_draft_version": 5,
-  "reason": "Session 2 is running beyond step 5450. The best validation selection score is 8.73 at step 4000; step 5000 did not improve it. Early-stopping patience is 1/5; held-out quality gates remain unverified.",
+  "reason": "Session 2 completed at step 5527. Continuation is bounded by remaining free quota with a one-hour untouched reserve; held-out release gates remain unverified.",
   "prepared_corpus": {
     "sample_rate": 8000,
     "english_hours": 30.0017175,
@@ -58,9 +58,9 @@
   },
   "training_job": {
     "kernel": "ritwik8307/voicesep-gpu-training-02/1",
-    "status": "running",
+    "status": "complete",
     "resumed_from_step": 2877,
-    "last_verified_step": 5450,
+    "last_verified_step": 5527,
     "validation_quality_verified": false,
     "best_validation_step": 4000,
     "best_validation_selection_score": 8.730274399635382,
@@ -75,5 +75,17 @@
     "last_checkpoint_sha256": "e4b7679aa9fd907f53c4cda7e2b2fca8ffcd7587b417ffea8a47a32056d2fe18",
     "best_checkpoint_step": 2000,
     "validation_selection_score": 4.018352616175803
+  },
+  "compute_budget": {
+    "initial_gpu_hours_remaining": 17.62,
+    "initial_tpu_hours_remaining": 20,
+    "untouched_reserve_hours_each": 1,
+    "policy": "docs/COMPUTE_BUDGET.md",
+    "paid_compute": false,
+    "quota_refresh_credited": false,
+    "gpu_kernel": "ritwik8307/voicesep-gpu-training-03/1",
+    "tpu_probe_kernel": "ritwik8307/voicesep-tpu-compatibility/1",
+    "tpu_probe_hard_seconds": 1200,
+    "first_gpu_hard_seconds": 21600
   }
 }

@@ -2,7 +2,7 @@
 
 A local audio workspace and reproducible English/Hindi speech-separation research pipeline.
 
-**Status: implementation under validation. The five-speaker model has not been trained or evaluated.**
+**Status: five-slot fine-tuning is underway. A trained research checkpoint exists; held-out four- and five-speaker release gates have not been verified.**
 The verified upstream checkpoint is a **two-speaker** backbone. Expanding its decoder does not confer five-speaker capability. The app refuses untrained checkpoints; it does not substitute filters, sample outputs, or duplicated audio for separation.
 
 ## Run locally

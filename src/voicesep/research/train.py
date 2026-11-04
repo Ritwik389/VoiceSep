@@ -71,7 +71,8 @@ def _optimizer_step(model, optimizer, scaler, clip_norm):
 
 
 def train(config_path, output_dir, pretrained=None, resume=None, device=None,
-          steps_override=None, benchmark=False, segment_seconds=None, max_seconds=None):
+          steps_override=None, benchmark=False, segment_seconds=None, max_seconds=None,
+          microbatch_size=1, data_parallel=False):
     if max_seconds is not None and max_seconds <= 0:
         raise ValueError("The wall-time budget must be positive")
     config = yaml.safe_load(Path(config_path).read_text())
@@ -89,6 +90,12 @@ def train(config_path, output_dir, pretrained=None, resume=None, device=None,
     else:
         model = VoiceSeparator(c)
     t, d = config["training"], config["data"]
+    # Runtime execution options preserve the saved effective batch and data sequence.
+    if microbatch_size < 1 or t["accumulation"] % microbatch_size:
+        raise ValueError("Microbatch size must divide the configured effective batch")
+    if data_parallel and (not device.startswith("cuda") or torch.cuda.device_count() < 2
+                          or microbatch_size < 2):
+        raise ValueError("Data parallel training requires two CUDA devices and microbatch size >= 2")
     if segment_seconds is not None:
         d["segment_seconds"] = segment_seconds
     if not resume:
@@ -145,6 +152,7 @@ def train(config_path, output_dir, pretrained=None, resume=None, device=None,
     output_dir.mkdir(parents=True, exist_ok=True)
     limit = step + 100 if benchmark else (steps_override if steps_override is not None else t["steps"])
     model.train()
+    forward_model = torch.nn.DataParallel(model, device_ids=[0, 1]) if data_parallel else model
     started = time.perf_counter()
     losses = []
     completed_draw_index = draw_index
@@ -155,18 +163,19 @@ def train(config_path, output_dir, pretrained=None, resume=None, device=None,
             model.freeze_backbone(False if benchmark else step < t["warmup_steps"])
             optimizer.zero_grad(set_to_none=True)
             total = 0.
-            for _ in range(t["accumulation"]):
-                mixture, references, _ = data.draw(draw_index)
-                draw_index += 1
-                mixture = torch.from_numpy(mixture).unsqueeze(0).to(device)
-                references = torch.from_numpy(references).unsqueeze(0).to(device)
+            for _ in range(t["accumulation"] // microbatch_size):
+                batch = [data.draw(draw_index + offset) for offset in range(microbatch_size)]
+                draw_index += microbatch_size
+                mixture = torch.from_numpy(np.stack([item[0] for item in batch])).to(device)
+                references = torch.from_numpy(np.stack([item[1] for item in batch])).to(device)
                 with torch.autocast(device_type=device.split(":")[0], dtype=torch.float16, enabled=use_amp):
-                    output = model(mixture)
+                    output = forward_model(mixture)
                     loss, _ = hungarian_loss(output, references, mixture, c.hop, c.n_fft)
                 if not torch.isfinite(loss):
                     raise FloatingPointError("Non-finite training loss")
-                scaler.scale(loss / t["accumulation"]).backward()
-                total += float(loss.detach()) / t["accumulation"]
+                weight = microbatch_size / t["accumulation"]
+                scaler.scale(loss * weight).backward()
+                total += float(loss.detach()) * weight
             updated = _optimizer_step(model, optimizer, scaler, t["clip_grad_norm"])
             completed_draw_index = draw_index
             if not updated:
@@ -214,6 +223,8 @@ def train(config_path, output_dir, pretrained=None, resume=None, device=None,
               "seconds_per_step": (time.perf_counter() - started) / max(len(losses), 1),
               "peak_cuda_memory_bytes": torch.cuda.max_memory_allocated() if device.startswith("cuda") else None,
               "device": device, "benchmark_only": benchmark, "release_ready": False,
+              "microbatch_size": microbatch_size, "data_parallel": data_parallel,
+              "effective_batch_size": t["accumulation"],
               "amp_skipped_updates": skipped_updates,
               "stopped_for_time_budget": max_seconds is not None and step < limit
               and time.perf_counter() - started >= max_seconds}

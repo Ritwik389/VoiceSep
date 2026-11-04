@@ -1,6 +1,8 @@
 # VoiceSep model card
 
-**Current five-speaker training/evaluation status: not run.**
+**Status: fine-tuning in progress; no held-out release result yet.**
+
+Session 2 completed at optimizer step 5,527. The best validation checkpoint is step 4,000 (selection score 8.73). That score combines SI-SDR improvement and count penalties across validation conditions; it is not a four- or five-speaker test metric. See [the compute budget](COMPUTE_BUDGET.md) for the remaining run and stop conditions.
 
 ## Intended task
 
