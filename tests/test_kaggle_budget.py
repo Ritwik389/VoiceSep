@@ -1,11 +1,13 @@
 import ast
 from datetime import timedelta
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import zipfile
 
 spec = importlib.util.spec_from_file_location('finish_budget', Path(__file__).resolve().parents[1] / 'scripts/finish_kaggle_budget.py')
 budget = importlib.util.module_from_spec(spec)
@@ -65,7 +67,8 @@ def test_uncertain_submission_cannot_spend_the_allowance_twice(tmp_path):
     assert flow.state['unallocated_seconds'] == 10000
 
 
-def test_controller_finishes_three_jobs_without_entering_one_hour_buffer(tmp_path):
+def test_controller_finishes_three_jobs_without_entering_one_hour_buffer(tmp_path, monkeypatch):
+    checkpoint = b'checkpoint software fixture'
     class Api:
         def __init__(self):
             self.hours = 17.62
@@ -97,22 +100,39 @@ def test_controller_finishes_three_jobs_without_entering_one_hour_buffer(tmp_pat
             (root / 'run-summary.json').write_text(json.dumps({
                 'step': 6000 + len(self.jobs)*1000, 'elapsed_seconds': job['seconds'] - 300,
                 'training_finalized': job['final'], 'evaluation_complete': job['final'],
-                'numeric_gate_passed': False}))
-            (root / 'voicesep-research.pt').write_bytes(b'checkpoint software fixture')
+                'numeric_gate_passed': False,
+                'inference_checkpoint_sha256': hashlib.sha256(checkpoint).hexdigest()}))
+            (root / 'voicesep-research.pt').write_bytes(checkpoint)
+            (root / 'evaluation').mkdir(exist_ok=True)
+            (root / 'evaluation/evaluation.json').write_text(json.dumps({
+                'automatic_count': True, 'numeric_gate_passed': False}))
+            (root / 'evaluation/evaluation.md').write_text('# Evaluation fixture\n')
             return [], None
     api = Api()
     flow = fixture_flow(tmp_path, api)
     flow.metadata = lambda *args: SimpleNamespace(is_private=True, enable_gpu=True, enable_tpu=False)
-    # Keep the inference install confined to this test workspace.
-    original_copy = budget.shutil.copyfile
-    def copy(source, destination):
-        return original_copy(source, tmp_path / 'installed.pt')
-    import unittest.mock
-    with unittest.mock.patch.object(budget.shutil, 'copyfile', copy):
-        flow.run()
+    # Keep the inference install and source package confined to this test workspace.
+    monkeypatch.setattr(budget, 'HERE', tmp_path / 'scripts')
+    (tmp_path / 'models').mkdir()
+    (tmp_path / 'dist').mkdir()
+    with zipfile.ZipFile(tmp_path / 'dist/voicesep-source.zip', 'w') as archive:
+        archive.writestr('README.md', 'Source bundle fixture')
+    monkeypatch.setattr(budget.subprocess, 'run', lambda *args, **kwargs: None)
+    flow.run()
     assert len(api.jobs) == 3
     assert [job['seconds'] for job in api.jobs] == [21600, 21600, 14400]
     assert api.hours >= 1 and flow.state['phase'] == 'complete'
     assert flow.state['release_ready'] is False
+    assert (tmp_path / 'models/best.pt').read_bytes() == checkpoint
+    with zipfile.ZipFile(flow.state['research_bundle']) as archive:
+        assert archive.read('voicesep-research.pt') == checkpoint
+        assert json.loads(archive.read('evaluation.json'))['automatic_count'] is True
     flow.run()
     assert len(api.jobs) == 3
+    # Retrying the local handoff cannot launch a new GPU job or install a corrupt artifact.
+    flow.save(phase='installing')
+    next((flow.output / 'session-05').rglob('voicesep-research.pt')).write_bytes(b'corrupt fixture')
+    with pytest.raises(ValueError, match='SHA-256'):
+        flow.run()
+    assert len(api.jobs) == 3
+    assert (tmp_path / 'models/best.pt').read_bytes() == checkpoint

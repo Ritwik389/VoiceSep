@@ -8,7 +8,7 @@ Intermediate jobs run for at most six hours. A final job receives at most four h
 
 Training ends at the first applicable limit: 20,000 steps, five stale validation checks, or the allocated quota deadline. The best validation checkpoint is selected before test evaluation. Quota completion may occur below 20,000 steps and is recorded as `quota_budget`; this is not a claim of convergence or a passed quality gate. Test failures must be reported rather than buying more compute or silently weakening the targets.
 
-The final stage saves automatic-count metrics, a compact inference checkpoint, and deterministic four/five-speaker listening examples. A known-count diagnostic runs only if time remains after the required report. The local controller downloads results and installs the research checkpoint. Listening review remains required before a validated V1 claim.
+The final stage saves automatic-count metrics, a compact inference checkpoint, and deterministic four/five-speaker listening examples. A known-count diagnostic runs only if time remains after the required report. The local controller checks the checkpoint digest, installs the research checkpoint, and builds `runs/kaggle-quota-finish/voicesep-research-bundle.zip` with source, model and evaluation. Listening examples stay separate. Listening review remains required before a validated V1 claim.
 
 A separate TPU compatibility probe has a 20-minute hard timeout and does not produce training weights. The PyTorch CUDA implementation cannot be credited with TPU throughput before its waveform transforms, loss assignment, numerical agreement, and backward pass have been tested. Unneeded TPU quota remains unused.
 

@@ -14,7 +14,9 @@ import math
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import sys
+import zipfile
 
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('voicesep_previous_workflow', HERE / 'run_kaggle_workflow.py')
@@ -111,6 +113,12 @@ class BudgetWorkflow(previous.Workflow):
             if stages and stages[-1]['status'] == 'running':
                 stage = stages[-1]
             else:
+                parent = self.state['parent']
+                self.wait(parent)
+                meta = self.read(self.metadata, self.api, parent)
+                if not meta.is_private or not meta.enable_gpu or meta.enable_tpu:
+                    raise ValueError('The resume parent must be a private GPU run')
+                # Fetch quota after any potentially long network wait, immediately before allocation.
                 remaining = self.gpu_hours()
                 final = bool(self.state.get('final_next'))
                 seconds = allocation(remaining, self.state['policy']['reserve_hours'],
@@ -119,11 +127,6 @@ class BudgetWorkflow(previous.Workflow):
                     final = True
                     seconds = allocation(remaining, self.state['policy']['reserve_hours'],
                                          self.state['unallocated_seconds'], True, self.state['quota_rate'])
-                parent = self.state['parent']
-                self.wait(parent)
-                meta = self.read(self.metadata, self.api, parent)
-                if not meta.is_private or not meta.enable_gpu or meta.enable_tpu:
-                    raise ValueError('The resume parent must be a private GPU run')
                 number = self.state['next_run']
                 folder = self.notebook(number, parent, seconds, final)
                 reserved = seconds * self.state['quota_rate'] + 600
@@ -176,13 +179,38 @@ class BudgetWorkflow(previous.Workflow):
             raise RuntimeError('Final evaluation must complete before local installation')
         destination = self.output / f"session-{stage['run']:02}"
         artifact = next(destination.rglob('voicesep-research.pt'))
-        local = Path(__file__).resolve().parents[1] / 'models' / 'voicesep-research.pt'
-        shutil.copyfile(artifact, local)
+        if hashlib.sha256(artifact.read_bytes()).hexdigest() != summary.get('inference_checkpoint_sha256'):
+            raise ValueError('Downloaded inference checkpoint does not match its recorded SHA-256')
+        evaluation = next(destination.rglob('evaluation/evaluation.json'))
+        report = json.loads(evaluation.read_text())
+        if (report.get('automatic_count') is not True or
+                report.get('numeric_gate_passed') != summary.get('numeric_gate_passed')):
+            raise ValueError('Downloaded evaluation is inconsistent with the final automatic-count report')
+        root = HERE.parent
+        local = root / 'models' / 'voicesep-research.pt'
+        temporary = local.with_suffix('.tmp')
+        shutil.copyfile(artifact, temporary)
+        temporary.replace(local)
         # The local app's documented default, installed only after held-out scoring.
-        if not local.with_name('best.pt').exists():
-            shutil.copyfile(artifact, local.with_name('best.pt'))
+        default = local.with_name('best.pt')
+        if not default.exists():
+            shutil.copyfile(artifact, temporary)
+            temporary.replace(default)
+        subprocess.run([sys.executable, str(HERE / 'package_source.py')], check=True)
+        package = self.output / 'voicesep-research-bundle.zip'
+        partial = package.with_suffix('.tmp')
+        with zipfile.ZipFile(partial, 'w', zipfile.ZIP_DEFLATED) as archive:
+            archive.write(root / 'dist/voicesep-source.zip', 'voicesep-source.zip')
+            archive.write(artifact, 'voicesep-research.pt')
+            archive.write(evaluation, 'evaluation.json')
+            archive.write(evaluation.with_suffix('.md'), 'evaluation.md')
+            archive.writestr('run-summary.json', json.dumps(summary, indent=2) + '\n')
+        partial.replace(package)
+        examples = next(destination.rglob('listening-examples.zip'), None)
         self.save(phase='complete', inference_checkpoint=str(local), release_ready=False,
-                  numeric_gate_passed=summary.get('numeric_gate_passed', False))
+                  numeric_gate_passed=summary.get('numeric_gate_passed', False),
+                  evaluation_report=str(evaluation), research_bundle=str(package),
+                  listening_examples=str(examples) if examples else None)
 
 
 if __name__ == '__main__':
