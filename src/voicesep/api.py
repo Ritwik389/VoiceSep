@@ -34,9 +34,9 @@ class RemixOptions(BaseModel):
     gains: dict[str, float]
 
 
-def create_app(data_dir=None, checkpoint=None, engine_factory=None):
+def create_app(data_dir=None, checkpoint=None, engine_factory=None, analysis_runner=None):
     store = JobStore(data_dir or os.getenv("VOICESEP_DATA_DIR", "data/sessions"))
-    worker = Worker(store, checkpoint, engine_factory)
+    worker = Worker(store, checkpoint, engine_factory, analysis_runner)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -125,6 +125,19 @@ def create_app(data_dir=None, checkpoint=None, engine_factory=None):
     def status(identifier: str):
         return get_job(identifier)
 
+    @app.post('/api/jobs/{identifier}/analysis', status_code=202)
+    def analyze_speakers(identifier: str):
+        with store.lock:
+            job = get_job(identifier)
+            if job['status'] != 'complete' or not job['speakers']:
+                raise HTTPException(409, 'Complete separation before analyzing speakers')
+            if identifier in worker.cancel_events:
+                raise HTTPException(409, 'This session already has work queued or running')
+            updated = store.update(identifier, speaker_analysis={
+                'status': 'queued', 'progress': 0., 'stage': 'Waiting for the local worker', 'error': None})
+            worker.submit(identifier, process='analysis')
+        return updated
+
     @app.post("/api/jobs/{identifier}/start")
     def start(identifier: str, options: StartOptions):
         job = get_job(identifier)
@@ -152,7 +165,7 @@ def create_app(data_dir=None, checkpoint=None, engine_factory=None):
                 if payload != previous:
                     yield f"data: {payload}\n\n"
                     previous = payload
-                if job["status"] in TERMINAL:
+                if job["status"] in TERMINAL and job.get('speaker_analysis', {}).get('status') not in {'queued', 'running'}:
                     break
                 await asyncio.sleep(0.25)
         return StreamingResponse(stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
@@ -188,7 +201,7 @@ def create_app(data_dir=None, checkpoint=None, engine_factory=None):
         if job["status"] != "complete":
             raise HTTPException(409, "Results are not ready")
         filenames = {"zip": "results.zip", "json": "results.json", "txt": "transcript.txt",
-                     "srt": "transcript.srt", "vtt": "transcript.vtt"}
+                     "srt": "transcript.srt", "vtt": "transcript.vtt", "analysis": "speaker-analysis.json"}
         if kind not in filenames:
             raise HTTPException(404, "Export format not found")
         path = store.directory(identifier) / filenames[kind]

@@ -1,10 +1,10 @@
 {
   "release_ready": false,
-  "stage": "fine_tuning_budgeted",
-  "five_speaker_checkpoint": null,
-  "evaluation_report": null,
+  "stage": "evaluated_research_checkpoint",
+  "five_speaker_checkpoint": "models/voicesep-research.pt",
+  "evaluation_report": "runs/kaggle-quota-finish/session-05/voicesep-checkpoints/evaluation/evaluation.json",
   "software_checks": {
-    "python_tests": 46,
+    "python_tests": 53,
     "kaggle_downloader_tests": 7,
     "kaggle_http_range_probe": "passed",
     "playback_tests": 3,
@@ -33,12 +33,12 @@
     "status_file": "runs/kaggle-quota-finish/status.json",
     "scope": "bounded continuation, validation calibration, held-out evaluation, artifact download",
     "started": true,
-    "state": "waiting_session_03",
+    "state": "complete",
     "after_preparation_version": 5
   },
-  "verified_on": "2026-11-04",
+  "verified_on": "2026-11-05",
   "corrected_preparation_draft_version": 5,
-  "reason": "Session 2 completed at step 5527. Continuation is bounded by remaining free quota with a one-hour untouched reserve; held-out release gates remain unverified.",
+  "reason": "The quota-bounded run completed at step 16645. The selected step-16000 checkpoint missed the held-out four- and five-speaker numeric release gate.",
   "prepared_corpus": {
     "sample_rate": 8000,
     "english_hours": 30.0017175,
@@ -57,16 +57,17 @@
     "peak_cuda_memory_bytes": 5045269504
   },
   "training_job": {
-    "kernel": "ritwik8307/voicesep-gpu-training-02/1",
+    "kernel": "ritwik8307/voicesep-gpu-training-05/1",
     "status": "complete",
-    "resumed_from_step": 2877,
-    "last_verified_step": 5527,
+    "resumed_from_step": 14652,
+    "last_verified_step": 16645,
     "validation_quality_verified": false,
-    "best_validation_step": 4000,
-    "best_validation_selection_score": 8.730274399635382,
-    "latest_validation_step": 5000,
-    "latest_validation_selection_score": 7.443824788609312,
-    "early_stopping_stale_checks": 1
+    "best_validation_step": 16000,
+    "best_validation_selection_score": 11.810325714742971,
+    "latest_validation_step": 16000,
+    "latest_validation_selection_score": 11.810325714742971,
+    "early_stopping_stale_checks": 0,
+    "stop_reason": "quota_budget"
   },
   "first_training_session": {
     "kernel": "ritwik8307/voicesep-gpu-training-01/1",
@@ -86,6 +87,38 @@
     "gpu_kernel": "ritwik8307/voicesep-gpu-training-03/1",
     "tpu_probe_kernel": "ritwik8307/voicesep-tpu-compatibility/1",
     "tpu_probe_hard_seconds": 1200,
-    "first_gpu_hard_seconds": 21600
+    "first_gpu_hard_seconds": 21600,
+    "final_gpu_hours_remaining": 2.34,
+    "final_tpu_hours_remaining": 20.0
+  },
+  "evaluation": {
+    "automatic_count": true,
+    "mixtures": 1200,
+    "numeric_gate_passed": false,
+    "listening_review": "pending",
+    "inference_checkpoint_sha256": "25589f0f1de3e4d5911e5e8ed81367ffa87c69ca46a092f08b5f0b0cb4b214b1"
+  },
+  "speaker_analysis_preview": {
+    "implemented": true,
+    "models": {
+      "age_vocal_presentation": {
+        "id": "audeering/wav2vec2-large-robust-6-ft-age-gender",
+        "revision": "a681b720dafd12b9dd7b6d13fb437c7b6b197fd3",
+        "license": "CC-BY-NC-SA-4.0"
+      },
+      "emotion": {
+        "id": "emotion2vec/emotion2vec_plus_base",
+        "revision": "b318240bfe67db81a8c572ecb37ce9c3759b81c9",
+        "license": "Publisher model-license; see the model card and FunASR MODEL_LICENSE"
+      }
+    },
+    "inference_device": "cpu",
+    "native_separation_sample_rate": 8000,
+    "model_input_sample_rate": 16000,
+    "experimental": true,
+    "english_hindi_accuracy_validation": "pending",
+    "real_pretrained_forward_checks": "passed",
+    "ui_seek_and_export_checks": "passed",
+    "plan": "docs/SPEAKER_ANALYSIS_PLAN.md"
   }
 }

@@ -1,0 +1,126 @@
+{
+  "source_archive_sha256": "73bf6b09eb9798f77d77c9395db4106950f5e0c9adc277c4bc3fa050f49fe2dd",
+  "description": "Synthetic overlapping mixtures derived from held-out recorded voices. Local listening fixtures.",
+  "examples": [
+    {
+      "file": "2-speakers/en-2-speakers.wav",
+      "speaker_count": 2,
+      "condition": "en",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/en-2-speakers",
+      "parent_test_mixture_id": "mix-98765-300",
+      "sha256": "0f1e4d9ea8d429dc4184fcf5263770f18e7da4a1c2339c96ae1df8bc54c3235d"
+    },
+    {
+      "file": "3-speakers/en-3-speakers.wav",
+      "speaker_count": 3,
+      "condition": "en",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/en-3-speakers",
+      "parent_test_mixture_id": "mix-98765-300",
+      "sha256": "f133f17e752fb0471071faad44b1c8ef1ff78ba454fbe5c30e39e45a79c27edc"
+    },
+    {
+      "file": "4-speakers/en-4-speakers.wav",
+      "speaker_count": 4,
+      "condition": "en",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/en-4-speakers",
+      "parent_test_mixture_id": "mix-98765-300",
+      "sha256": "62deded4f33ccde736a809aeb2d90acdc185e5b1f5c00ed65b1073ab5c5d0dc3"
+    },
+    {
+      "file": "5-speakers/en-5-speakers.wav",
+      "speaker_count": 5,
+      "condition": "en",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/en-5-speakers",
+      "parent_test_mixture_id": "mix-98765-300",
+      "sha256": "636d0dc0e9c7569af10c9197f07227904a9ed3ab40128e1c178ab8ca91c887c1"
+    },
+    {
+      "file": "2-speakers/hi-2-speakers.wav",
+      "speaker_count": 2,
+      "condition": "hi",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/hi-2-speakers",
+      "parent_test_mixture_id": "mix-98765-700",
+      "sha256": "146ec7a3d66bcc2827eee54c46c5ea2597f043092e45868135f1f157af0aeb10"
+    },
+    {
+      "file": "3-speakers/hi-3-speakers.wav",
+      "speaker_count": 3,
+      "condition": "hi",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/hi-3-speakers",
+      "parent_test_mixture_id": "mix-98765-700",
+      "sha256": "95771fea92690c6377639d839fde309b7d87c59d6b409973cb4a961cfbb3bad7"
+    },
+    {
+      "file": "4-speakers/hi-4-speakers.wav",
+      "speaker_count": 4,
+      "condition": "hi",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/hi-4-speakers",
+      "parent_test_mixture_id": "mix-98765-700",
+      "sha256": "4be7ac2fc371254055a5139ff98668af6d4aba48ea08a02a35c56765eddf1621"
+    },
+    {
+      "file": "5-speakers/hi-5-speakers.wav",
+      "speaker_count": 5,
+      "condition": "hi",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/hi-5-speakers",
+      "parent_test_mixture_id": "mix-98765-700",
+      "sha256": "06a95b1af52a14c76af87100185c5ac3afc2c831427fa927ccaa5efb86dfb080"
+    },
+    {
+      "file": "2-speakers/mixed-2-speakers.wav",
+      "speaker_count": 2,
+      "condition": "mixed",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/mixed-2-speakers",
+      "parent_test_mixture_id": "mix-98765-1100",
+      "sha256": "43b37afd06740f30173b0f0fe1e31d526baa9e24bd6335e6bd2a16600110c4b1"
+    },
+    {
+      "file": "3-speakers/mixed-3-speakers.wav",
+      "speaker_count": 3,
+      "condition": "mixed",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/mixed-3-speakers",
+      "parent_test_mixture_id": "mix-98765-1100",
+      "sha256": "b280a1607c052eedb93997378a1525b045b6a7097a9f3017e4b952b05b76e6f8"
+    },
+    {
+      "file": "4-speakers/mixed-4-speakers.wav",
+      "speaker_count": 4,
+      "condition": "mixed",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/mixed-4-speakers",
+      "parent_test_mixture_id": "mix-98765-1100",
+      "sha256": "0defa82533eedf3fb180d8835bd32b64a19e65d470b72c4315167c5d242ca61f"
+    },
+    {
+      "file": "5-speakers/mixed-5-speakers.wav",
+      "speaker_count": 5,
+      "condition": "mixed",
+      "sample_rate": 8000,
+      "seconds": 4.0,
+      "reference_folder": "references/mixed-5-speakers",
+      "parent_test_mixture_id": "mix-98765-1100",
+      "sha256": "34a81e9ed20e2f4ebca9e22f2a2812ea442cb7a31bc5894d0044c46a31ed890e"
+    }
+  ]
+}

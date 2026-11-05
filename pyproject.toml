@@ -18,6 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+analysis = ["transformers>=4.44,<6", "huggingface-hub>=0.27,<2", "safetensors>=0.4,<1", "funasr==1.4.22", "torchaudio>=2.4,<3", "certifi>=2024.2"]
 transcription = ["faster-whisper>=1.1,<2"]
 baseline = ["asteroid>=0.7,<1"]
 tracking = ["speechbrain>=1.0,<2", "torchaudio>=2.2,<3"]

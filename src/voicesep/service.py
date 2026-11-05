@@ -15,11 +15,41 @@ from .storage import TERMINAL
 from .transcription import transcribe_tracks, subtitle_text
 
 
+def write_exports(directory, job):
+    names = {speaker['id']: speaker['name'] for speaker in job['speakers']}
+    transcript = job.get('transcript', [])
+    for kind in ('srt', 'vtt'):
+        (directory / f'transcript.{kind}').write_text(subtitle_text(transcript, names, kind))
+    (directory / 'transcript.txt').write_text('\n'.join(
+        f"{names.get(segment['speaker_id'], segment['speaker_id'])}: {segment['text']}" for segment in transcript))
+    temporary_json = directory / 'results.json.tmp'
+    temporary_json.write_text(json.dumps(job, ensure_ascii=False, indent=2))
+    temporary_json.replace(directory / 'results.json')
+    extra = []
+    if job.get('speaker_analysis'):
+        analysis = {'analysis': job['speaker_analysis'], 'speakers': [
+            {'id': speaker['id'], 'name': speaker['name'], 'analysis': speaker.get('analysis')}
+            for speaker in job['speakers']]}
+        temporary = directory / 'speaker-analysis.json.tmp'
+        temporary.write_text(json.dumps(analysis, ensure_ascii=False, indent=2))
+        temporary.replace(directory / 'speaker-analysis.json')
+        extra.append(directory / 'speaker-analysis.json')
+    temporary_archive = directory / 'results.zip.tmp'
+    paths = [directory / 'selection.wav', directory / 'results.json',
+             *(directory / f"{speaker['id']}.wav" for speaker in job['speakers']),
+             *(directory / f'transcript.{kind}' for kind in ('txt', 'srt', 'vtt')), *extra]
+    with zipfile.ZipFile(temporary_archive, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in paths:
+            archive.write(path, path.name)
+    temporary_archive.replace(directory / 'results.zip')
+
+
 class Worker:
-    def __init__(self, store, checkpoint=None, engine_factory=None):
+    def __init__(self, store, checkpoint=None, engine_factory=None, analysis_runner=None):
         self.store = store
         self.checkpoint = Path(checkpoint or os.getenv("VOICESEP_CHECKPOINT", "models/best.pt")).expanduser().resolve()
         self.engine_factory = engine_factory or SeparationEngine
+        self.analysis_runner = analysis_runner
         self.queue = queue.Queue()
         self.cancel_events = {}
         self.engine = None
@@ -87,15 +117,54 @@ class Worker:
             event = self.cancel_events[identifier]
             try:
                 if event.is_set():
-                    continue
-                self.process(identifier, process, checkpoint, event)
+                    raise InterruptedError('Processing cancelled')
+                if process == 'analysis':
+                    self.analyze(identifier, event)
+                else:
+                    self.process(identifier, process, checkpoint, event)
             except InterruptedError:
-                self.store.update(identifier, status="cancelled", error=None)
+                if process == 'analysis':
+                    self.store.update(identifier, speaker_analysis={'status': 'cancelled', 'progress': 0., 'error': None})
+                else:
+                    self.store.update(identifier, status="cancelled", error=None)
             except Exception as error:
-                self.store.update(identifier, status="failed", error=str(error)[:500])
+                if process == 'analysis':
+                    self.store.update(identifier, speaker_analysis={'status': 'failed', 'progress': 0.,
+                                                                  'error': str(error)[:500]})
+                else:
+                    self.store.update(identifier, status="failed", error=str(error)[:500])
             finally:
                 self.cancel_events.pop(identifier, None)
                 self.queue.task_done()
+
+    def analyze(self, identifier, event):
+        from .speaker_analysis import analyze_tracks
+        job = self.store.get(identifier)
+        directory = self.store.directory(identifier)
+        paths = [(speaker['id'], directory / f"{speaker['id']}.wav") for speaker in job['speakers']]
+        self.engine, self.engine_path = None, None
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        def progress(stage, value):
+            if event.is_set():
+                raise InterruptedError('Speaker analysis cancelled')
+            self.store.update(identifier, speaker_analysis={'status': 'running', 'progress': value,
+                                                           'stage': stage, 'error': None})
+        progress('Selecting usable speech segments', 0.)
+        runner = self.analysis_runner or analyze_tracks
+        result = runner(paths, job['speakers'], job['options'].get('language'),
+                        cancelled=event.is_set, progress=progress)
+        if event.is_set():
+            raise InterruptedError('Speaker analysis cancelled')
+        speakers = [dict(speaker, analysis=result[speaker['id']]) for speaker in job['speakers']]
+        incomplete = any(value[name]['status'] == 'unavailable' for value in result.values()
+                         for name in ('age', 'vocal_presentation', 'emotion'))
+        state = {'status': 'partial' if incomplete else 'complete', 'progress': 1.,
+                 'stage': 'Speaker analysis finished', 'error': None}
+        final = dict(self.store.get(identifier), speakers=speakers, speaker_analysis=state)
+        write_exports(directory, final)
+        self.store.update(identifier, speakers=speakers, speaker_analysis=state)
 
     def process(self, identifier, process, checkpoint, event):
         directory = self.store.directory(identifier)
@@ -168,18 +237,7 @@ class Worker:
                                       detected_count=len(speakers), flags=flags, transcript=transcript,
                                       sample_rate=result["sample_rate"])
         final = dict(exporting, status="complete", progress=1.)
-        names = {s["id"]: s["name"] for s in speakers}
-        for kind in ("srt", "vtt"):
-            (directory / f"transcript.{kind}").write_text(subtitle_text(transcript, names, kind))
-        (directory / "transcript.txt").write_text("\n".join(f"{names.get(s['speaker_id'], s['speaker_id'])}: {s['text']}" for s in transcript))
-        # Do not leak server-local checkpoint or data paths in exported results.
-        (directory / "results.json").write_text(json.dumps(final, ensure_ascii=False, indent=2))
-        temporary_archive = directory / "results.zip.tmp"
-        with zipfile.ZipFile(temporary_archive, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            for path in [directory / "selection.wav", directory / "results.json",
-                         *(path for _, path in paths), *(directory / f"transcript.{kind}" for kind in ("txt", "srt", "vtt"))]:
-                archive.write(path, path.name)
-        temporary_archive.replace(directory / "results.zip")
+        write_exports(directory, final)
         if event.is_set():
             raise InterruptedError()
         self.store.update(identifier, status="complete", progress=1.)

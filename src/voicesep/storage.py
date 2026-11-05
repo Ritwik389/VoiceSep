@@ -18,6 +18,9 @@ class JobStore:
         with self.connection() as db:
             db.execute("CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, created REAL NOT NULL, payload TEXT NOT NULL)")
         for job in self.list():
+            if job.get('speaker_analysis', {}).get('status') in {'queued', 'running'}:
+                self.update(job['id'], speaker_analysis={'status': 'failed', 'progress': 0.,
+                            'error': 'Speaker analysis was interrupted. Retry from the completed session.'})
             if job["status"] not in TERMINAL:
                 self.update(job["id"], status="failed", error="Processing was interrupted by a server restart. Import again to retry.")
 

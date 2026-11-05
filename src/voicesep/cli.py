@@ -29,6 +29,26 @@ def doctor(checkpoint: Path = Path("models/best.pt")):
           "mps": torch.backends.mps.is_available(), "ffmpeg": shutil.which("ffmpeg"), "model": state})
 
 
+@app.command('download-analysis-models')
+def download_analysis_models():
+    """Download the pinned Hugging Face speaker-attribute models for local research use."""
+    from .analysis_models import download_models
+    emit(download_models())
+
+
+@app.command('analyze')
+def analyze_audio(audio: Path = typer.Argument(..., exists=True, dir_okay=False),
+                  output: Path = Path('runs/speaker-analysis.json'), language: str | None = None):
+    """Analyze one isolated voice using local pretrained age and emotion models."""
+    from .speaker_analysis import analyze_tracks
+    if language not in {None, 'en', 'hi'}:
+        raise typer.BadParameter('Language must be en or hi')
+    result = analyze_tracks([('speaker-1', audio)], language=language)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(result, indent=2, ensure_ascii=False) + '\n')
+    emit({'output': str(output), 'analysis': result})
+
+
 @app.command("download-backbone")
 def download_backbone(destination: Path = Path("models/tflocoformer-libri2mix.pth")):
     """Download and checksum the official TWO-speaker backbone (not a trained five-speaker model)."""

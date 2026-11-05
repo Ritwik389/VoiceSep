@@ -17,3 +17,5 @@ Do not relabel these comparison weights as Apache-2.0; retain both notices and c
 
 LibriSpeech and IndicVoices-R: retain source attribution and their dataset licenses.
 Optional ECAPA, Whisper, age, and emotion checkpoints: follow each model's own terms.
+
+Optional speaker analysis downloads audEERING wav2vec2 age/gender weights (CC-BY-NC-SA-4.0) and emotion2vec+ base weights (publisher model-license linked to FunASR). Author names, model IDs, pinned revisions and terms are documented in docs/SPEAKER_ANALYSIS_PLAN.md. Model weight licenses apply separately from the VoiceSep source license.

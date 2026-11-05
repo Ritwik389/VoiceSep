@@ -1,8 +1,8 @@
 # VoiceSep model card
 
-**Status: fine-tuning in progress; no held-out release result yet.**
+**Status: evaluated research checkpoint. The numeric release gate failed.**
 
-Session 2 completed at optimizer step 5,527. The best validation checkpoint is step 4,000 (selection score 8.73). That score combines SI-SDR improvement and count penalties across validation conditions; it is not a four- or five-speaker test metric. See [the compute budget](COMPUTE_BUDGET.md) for the remaining run and stop conditions.
+Training ended at step 16,645 under the free GPU budget. Step 16,000 had the best validation selection score of 11.81 and was calibrated on validation data before held-out evaluation. See [the compute budget](COMPUTE_BUDGET.md) for the stop conditions.
 
 ## Intended task
 
@@ -16,7 +16,7 @@ Objective: Hungarian-matched SI-SDR plus amplitude error on active sources, norm
 
 ## Known limitations
 
-- No validated five-speaker, Hindi, code-switching, noisy-room, or live capability until measured.
+- Held-out English, Hindi, and mixed-language mixtures measure scripted overlap at 8 kHz. Noisy rooms, spontaneous conversations, code-switching within an utterance, and live use remain unvalidated.
 - 8 kHz outputs contain no original content above 4 kHz.
 - Silence detection is an amplitude guard, not a certified speech detector.
 - Default tracking aligns overlapping audio. Optional ECAPA embeddings can improve tracking after pauses, but require separate evaluation.
@@ -27,8 +27,16 @@ Objective: Hungarian-matched SI-SDR plus amplitude error on active sources, norm
 
 ## Release evidence
 
-Record checkpoint and benchmark hashes, sampling rate, training-data size, automatic vs oracle count, each language/count condition, actual compute, numeric gates, and a signed listening review. A checkpoint having optimizer steps does not establish quality.
+The automatic-count evaluation covered 1,200 held-out mixtures. The gate requires at least 10 dB mean SI-SDR improvement and 90% exact count accuracy in each four- and five-speaker condition.
+
+| Condition | 4-speaker SI-SDRi / count | 5-speaker SI-SDRi / count |
+|---|---:|---:|
+| English | 12.05 dB / 89% | 9.17 dB / 88% |
+| Hindi | 9.96 dB / 71% | 8.84 dB / 89% |
+| Mixed | 12.41 dB / 89% | 9.51 dB / 95% |
+
+The research bundle contains the detailed automatic-count evaluation. The Kaggle output also contains the known-count diagnostic and listening examples. Human listening review and reference-aligned ASR scoring remain pending.
 
 ## Later analysis
 
-Age range, perceived vocal presentation, and emotion are later experimental features. Native 16 kHz training, bilingual calibration, uncertainty/abstention, and comparison of original versus separated speech are prerequisites. They are not implemented as fabricated V1 predictions.
+Age range, vocal gender presentation and temporal emotion now have a local pretrained research preview. Results carry source-bandwidth and validation warnings, with abstention for insufficient speech. Native 16 kHz separation, bilingual calibration and clean-versus-separated comparisons are the next validation steps. See [the implementation plan](SPEAKER_ANALYSIS_PLAN.md).

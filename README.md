@@ -2,8 +2,16 @@
 
 A local audio workspace and reproducible English/Hindi speech-separation research pipeline.
 
-**Status: five-slot fine-tuning is underway. A trained research checkpoint exists; held-out four- and five-speaker release gates have not been verified.**
+**Status: the quota-bounded training run and held-out evaluation are complete. The step-16,000 research checkpoint is available for local use. The four- and five-speaker release thresholds were missed.**
 The verified upstream checkpoint is a **two-speaker** backbone. Expanding its decoder does not confer five-speaker capability. The app refuses untrained checkpoints; it does not substitute filters, sample outputs, or duplicated audio for separation.
+
+## Test audio and speaker attributes
+
+Open [the local test-audio folder](examples/test-audio/README.md) for English, Hindi and mixed-language WAVs with two through five overlapping voices. Each file has clean reference tracks for comparison.
+
+Install `pip install -e '.[analysis]'`, then run `voicesep download-analysis-models`. After separation, choose **Analyze all speakers** in the speaker inspector for broad age ranges, vocal gender presentation and emotion segments. The pretrained weights download once and run locally. The audEERING model uses noncommercial terms. Estimates from the current 8 kHz tracks are experimental.
+
+For one isolated voice, run `voicesep analyze voice.wav --output runs/voice-analysis.json`. The [speaker-analysis plan](docs/SPEAKER_ANALYSIS_PLAN.md) covers validation, native 16 kHz separation and the following robustness phase.
 
 ## Run locally
 
